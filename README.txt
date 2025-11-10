@@ -1,3 +1,8 @@
+J'ai (Hugo) séparé le fichier de l'app en 3 pour alléger le tout, une partie logique du serveur et une autre ui
+
+
+
+
 Zone 1 : Les secteurs les plus chers. Comprend les Paris 6e, 7e, 8e, 16e et Neuilly-sur-Seine.
 
 Zone 2 : Le reste de Paris intra-muros (sauf 13e, 19e, 20e) et quelques communes très proches et chères. Comprend les Paris 1er, 2e, 3e, 4e, 5e, 9e, 10e, 11e, 12e, 14e, 15e, 17e, 18e, ainsi que Boulogne-Billancourt, Levallois-Perret, Saint-Mandé et Vincennes.
