@@ -1,4 +1,0 @@
-library(DBI)
-library(RSQLite)
-
-con <- dbConnect(SQLite(), "ma_base.db")
