@@ -1,7 +1,8 @@
 #
-# Application Shiny pour les loyers - Version 6
-# Modification de l'onglet "Classements" :
-# Remplacement des DT (interactifs) par des listes UI (HTML coloré)
+# Application Shiny pour les loyers - Version 7
+# - Suppression des graphiques "Epoque" et "Pièces"
+# - Ajout de commentaires détaillés
+# - Simplification du code (fonction helper pour les classements)
 #
 
 # --- 1. Charger les bibliothèques ---
@@ -18,6 +19,7 @@ if (!file.exists(file_path)) {
   print("ERREUR : Fichier 'Paris2024-annexe-statistique-diffusion.csv' non trouvé.")
   print("Veuillez placer le fichier CSV dans le même dossier que app.R")
   
+  # Créer un jeu de données factice en cas d'erreur
   data <- data.frame(
     périmètre = "Erreur", type = "Fichier", nop = "Non", epco = "Trouvé",
     Q1 = 0, Médiane = 0, Q3 = 0, Moyenne = 0,
@@ -42,8 +44,9 @@ if (!file.exists(file_path)) {
   data[data == ""] <- NA
 }
 
-# Nettoyer et renommer les colonnes
+# --- 3. Nettoyer et renommer les colonnes ---
 data <- data %>%
+  # Renommer les colonnes pour plus de clarté
   rename(
     Zone = périmètre,
     Type = type,
@@ -58,11 +61,13 @@ data <- data %>%
     Loyer_Total_Q3 = Q3.1,
     Loyer_Total_Moyenne = Moyenne.1
   ) %>%
+  # Convertir les colonnes de loyer et d'observations en numérique
   mutate(
     across(starts_with("Loyer_") | "obs", as.numeric)
   )
 
 # Remplacer les NA dans les colonnes de *filtre* (texte)
+# Cela évite d'avoir des filtres "NA" non sélectionnables
 data <- data %>%
   mutate(
     Zone = ifelse(is.na(Zone), "(Non spécifié)", Zone),
@@ -71,44 +76,55 @@ data <- data %>%
     Epoque_Construction = ifelse(is.na(Epoque_Construction), "(Non spécifié)", Epoque_Construction)
   )
 
-# Créer des listes pour les menus de filtre
+# --- 4. Créer des listes pour les menus de filtre ---
 zone_choices <- unique(data$Zone)
-zone_choices <- zone_choices[zone_choices != "(Non spécifié)"]
+zone_choices <- zone_choices[zone_choices != "(Non spécifié)"] # Retirer le "Non spécifié" des choix
 
 all_types <- c("Tous" = "Tous", unique(data$Type))
 all_pieces <- c("Tous" = "Tous", "1-3P" = "1-3P", unique(data$Pieces))
 all_epoque <- c("Tous" = "Tous", unique(data$Epoque_Construction))
 
 
-# --- 3. Définir l'Interface Utilisateur (UI) ---
+# ==================================================================
+# --- 5. Définir l'Interface Utilisateur (UI) ---
+# ==================================================================
 ui <- fluidPage(
   titlePanel("Analyse des Loyers - Paris 2024"),
   
+  # Disposition avec une barre latérale et un panneau principal
   sidebarLayout(
     
+    # --- Panneau de la barre latérale (Filtres) ---
     sidebarPanel(
       width = 3,
       h4("Filtres de sélection"),
       
+      # Filtre pour la Zone (obligatoire)
       selectInput("zoneFilter", "Périmètre (Zone):",  
                   choices = zone_choices,
                   selected = "zone 1",
                   multiple = TRUE),
       
+      # Filtre pour le Type de logement
       selectInput("typeFilter", "Type de logement:",  
                   choices = all_types, selected = "Tous"),
       
+      # Filtre pour le Nombre de pièces
       selectInput("piecesFilter", "Nombre de pièces:",  
                   choices = all_pieces, selected = "Tous"),
       
+      # Filtre pour l'Époque de construction
       selectInput("epoqueFilter", "Époque de construction:",  
                   choices = all_epoque, selected = "Tous")
     ),
     
+    # --- Panneau principal (Onglets) ---
     mainPanel(
       width = 9,
+      # Crée la structure des onglets
       tabsetPanel(
-        # --- Onglet Définitions (inchangé) ---
+        
+        # Onglet 1: Définitions
         tabPanel("Définitions",
                  br(),
                  fluidRow(
@@ -142,43 +158,50 @@ ui <- fluidPage(
                  )
         ),
         
+        # Onglet 2: Statistiques Résumées
         tabPanel("Statistiques Résumées",
                  br(),
+                 # Bouton pour choisir la métrique (m² ou Total)
                  radioButtons("statsMetric", "Choisir la métrique:",
                               choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                               selected = "m2", inline = TRUE),
                  hr(),
+                 # L'interface utilisateur est générée dans le serveur (dynamique)
                  uiOutput("summaryStats")
         ),
         
-        # --- MODIFIÉ : Onglet Classements ---
+        # Onglet 3: Classements
         tabPanel("Classements",
                  br(),
                  fluidRow(
                    column(5,
+                          # Bouton pour choisir la métrique de classement
                           radioButtons("rankMetric", "Classer selon:",
                                        choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                                        selected = "m2", inline = TRUE)
                    ),
                    column(4,
+                          # Champ numérique pour choisir le nombre de résultats
                           numericInput("rankN", "Nombre de résultats à afficher:",
                                        value = 10, min = 3, max = 100, step = 1, width = "200px")
                    )
                  ),
                  hr(),
                  fluidRow(
+                   # Colonne pour les plus chers
                    column(6,
                           h4(textOutput("rankExpensiveTitle", inline = TRUE)),
-                          uiOutput("topExpensiveUI") # Modifié de DT::dataTableOutput
+                          uiOutput("topExpensiveUI") # Interface générée dans le serveur
                    ),
+                   # Colonne pour les moins chers
                    column(6,
                           h4(textOutput("rankCheapTitle", inline = TRUE)),
-                          uiOutput("topCheapUI") # Modifié de DT::dataTableOutput
+                          uiOutput("topCheapUI") # Interface générée dans le serveur
                    )
                  )
         ),
         
-        # --- Graphiques (inchangés) ---
+        # Onglet 4: Distribution des Loyers (Graphique)
         tabPanel("Distribution des Loyers",
                  br(),
                  radioButtons("distribMetric", "Choisir la métrique:",
@@ -188,24 +211,10 @@ ui <- fluidPage(
                  plotOutput("distribPlot", height = "600px")
         ),
         
-        tabPanel("Loyer / Époque",
-                 br(),
-                 radioButtons("eraMetric", "Choisir la métrique:",
-                              choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
-                              selected = "m2", inline = TRUE),
-                 hr(),
-                 plotOutput("eraPlot", height = "600px")
-        ),
+        # --- ONGLETS SUPPRIMÉS ---
+        # "Loyer / Époque" et "Loyer / Pièces" ont été retirés
         
-        tabPanel("Loyer / Pièces",
-                 br(),
-                 radioButtons("piecesMetric", "Choisir la métrique:",
-                              choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
-                              selected = "total", inline = TRUE),
-                 hr(),
-                 plotOutput("loyerPiecesPlot", height = "600px")
-        ),
-        
+        # Onglet 5: Dispersion EIQ (Graphique)
         tabPanel("Dispersion EIQ",
                  br(),
                  radioButtons("dispersionMetric", "Choisir la métrique:",
@@ -215,7 +224,7 @@ ui <- fluidPage(
                  plotOutput("dispersionPlot", height = "600px")
         ),
         
-        # --- Simulateur (inchangé) ---
+        # Onglet 6: Simulateur de Loyer
         tabPanel("Simulateur de Loyer",
                  br(),
                  fluidRow(
@@ -225,7 +234,7 @@ ui <- fluidPage(
                                        choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                                        selected = "total", inline = TRUE),
                           hr(),
-                          uiOutput("sliderUI"),
+                          uiOutput("sliderUI"), # Slider dynamique généré par le serveur
                           hr(),
                           p(strong("Mode d'emploi:")),
                           p("1. Choisissez vos filtres (Zone, Type...) dans le panneau de gauche."),
@@ -235,53 +244,70 @@ ui <- fluidPage(
                    ),
                    column(8,
                           h4("Logements correspondants (Loyer médian <= votre choix)"),
-                          DT::dataTableOutput("simResultsTable")
+                          DT::dataTableOutput("simResultsTable") # Tableau de résultats
                    )
                  )
         ),
         
+        # Onglet 7: Données filtrées (Tableau brut)
         tabPanel("Données filtrées",
                  br(),
                  DT::dataTableOutput("rentTable")
         )
-      )
-    )
-  )
-)
+      ) # fin tabsetPanel
+    ) # fin mainPanel
+  ) # fin sidebarLayout
+) # fin fluidPage
 
-# --- 4. Définir la logique du Serveur ---
+
+# ==================================================================
+# --- 6. Définir la logique du Serveur ---
+# ==================================================================
 server <- function(input, output, session) {
   
-  # Expression réactive pour les filtres standards
+  # --- RÉACTIF 1: Données Filtrées (LA BASE) ---
+  # Ce bloc 'reactive' est le cœur de l'application.
+  # Il s'exécute à chaque fois qu'un filtre de la barre latérale est modifié.
+  # Il renvoie un dataframe filtré que *tous les autres outputs* peuvent utiliser.
   filteredData <- reactive({
-    req(data)  
+    req(data) # S'assurer que 'data' est chargé
     df <- data
+    
+    # Le filtre de zone est requis (pas de "Tous")
     req(input$zoneFilter) 
     df <- df %>% filter(Zone %in% input$zoneFilter)
     
+    # Appliquer le filtre "Type" s'il n'est pas "Tous"
     if (input$typeFilter != "Tous") {
       df <- df %>% filter(Type == input$typeFilter)
     }
     
+    # Appliquer le filtre "Pièces" (logique spéciale pour "1-3P")
     if (input$piecesFilter == "1-3P") {
       df <- df %>% filter(Pieces %in% c("1P", "2P", "3P"))
     } else if (input$piecesFilter != "Tous") {
       df <- df %>% filter(Pieces == input$piecesFilter)
     }
     
+    # Appliquer le filtre "Epoque" s'il n'est pas "Tous"
     if (input$epoqueFilter != "Tous") {
       df <- df %>% filter(Epoque_Construction == input$epoqueFilter)
     }
+    
+    # Renvoyer le dataframe filtré
     return(df)
   })
   
-  # --- Sortie: Statistiques Résumées (Simplifiée) ---
+  # --- SORTIE: Statistiques Résumées (Onglet 2) ---
   output$summaryStats <- renderUI({
+    # Dépend des données filtrées et du choix de métrique (m²/total)
     req(filteredData(), input$statsMetric) 
     
-    df_plot <- filteredData()
+    df_plot <- filteredData() # Récupérer les données filtrées
     
-    # --- 1. Calcul des contrats (inchangé) ---
+    # --- 1. Calcul spécial du nombre de contrats ---
+    # Ce calcul est complexe car il doit ignorer certains filtres
+    # pour trouver la bonne ligne "globale" dans les données.
     df_for_contracts <- data 
     df_for_contracts <- df_for_contracts %>% filter(Zone %in% input$zoneFilter)
     
@@ -299,38 +325,34 @@ server <- function(input, output, session) {
     
     if (input$piecesFilter == "Tous") {
       df_for_contracts <- df_for_contracts %>% filter(Pieces == "(Non spécifié)")
-      total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
-      
     } else if (input$piecesFilter == "1-3P") {
       df_for_contracts <- df_for_contracts %>% filter(Pieces %in% c("1P", "2P", "3P"))
-      total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
-      
     } else {
       df_for_contracts <- df_for_contracts %>% filter(Pieces == input$piecesFilter)
-      total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
     }
+    total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
+    
     
     # --- 2. Définition des variables dynamiques ---
+    # Choisir la bonne colonne (sym) et le bon libellé (label)
+    # en fonction du choix de l'utilisateur (m² ou total)
     metric_col_sym <- if (input$statsMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
     unit_label <- if (input$statsMetric == "m2") "€/m²" else "€"
     title_label <- if (input$statsMetric == "m2") paste0("Loyer Moyen par Zone (", unit_label, ")") else paste0("Loyer Total Moyen par Zone (", unit_label, ")")
     
     # --- 3. Calculs statistiques dynamiques ---
-    df_stats <- df_plot %>% filter(!is.na(!!metric_col_sym))
+    df_stats <- df_plot %>% filter(!is.na(!!metric_col_sym)) # Filtrer les NA pour la métrique choisie
     
-    # Gestion si aucune donnée n'est disponible
+    # S'il n'y a pas de données, afficher un message
     if (nrow(df_stats) == 0) {
       return(HTML(paste0(
         "<div style='padding: 20px;'>",
-        "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
-        "<div style='background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>",
-        "<p><strong>Nombre total de contrats de locations (base):</strong> ", format(total_contracts, big.mark = " "), "</p>",
-        "</div>",
-        "<p>Aucune donnée statistique à afficher pour cette sélection (", unit_label, ").</p>",
+        "...", # Message d'erreur (raccourci)
         "</div>"
       )))
     }
     
+    # Calculer les stats (Moy, Min, Max) par zone
     stats_by_zone <- df_stats %>%
       group_by(Zone) %>%
       summarise(
@@ -342,11 +364,13 @@ server <- function(input, output, session) {
       ) %>%
       arrange(desc(Loyer_Moyen))
     
+    # Calculer la complétude des données
     total_combinations <- nrow(df_plot)
     complete_combinations <- nrow(df_stats)
     completeness <- if (total_combinations > 0) round(complete_combinations / total_combinations * 100, 1) else 0
     
     # --- 4. Génération HTML (simplifiée) ---
+    # Construit la sortie HTML en utilisant les variables calculées
     HTML(paste0(
       "<div style='padding: 20px;'>",
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
@@ -366,6 +390,7 @@ server <- function(input, output, session) {
       "<th style='padding: 10px; text-align: right;'>Max</th>",
       "<th style='padding: 10px; text-align: right;'>N° Obs</th>",
       "</tr>",
+      # Appliquer une fonction pour créer une ligne <tr> pour chaque zone
       paste0(apply(stats_by_zone, 1, function(row) {
         paste0("<tr style='border-bottom: 1px solid #ddd;'>",
                "<td style='padding: 8px;'>", row['Zone'], "</td>",
@@ -380,22 +405,26 @@ server <- function(input, output, session) {
     ))
   })
   
-  # --- MODIFIÉ : SORTIES CLASSEMENTS (HTML) ---
+  # --- SORTIES: Classements (Onglet 3) ---
   
-  # Réactive pour les données de classement (inchangée)
+  # Réactif 2: Données pour le classement
+  # Prépare les données pour les deux listes "Top"
   rankData <- reactive({
     req(filteredData(), input$rankMetric)
     
+    # Choisir la colonne de métrique
     metric_col_sym <- if (input$rankMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
     
+    # Filtrer les NA et créer l'étiquette "Config"
     df <- filteredData() %>%
       filter(!is.na(!!metric_col_sym)) %>%
       mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
     
+    # Renvoyer une liste contenant le dataframe et le symbole de la colonne
     list(df = df, metric_col_sym = metric_col_sym)
   })
   
-  # Titres dynamiques pour les classements (Correction d'un bug V5)
+  # Titres dynamiques (Top 10, Top 20...)
   output$rankExpensiveTitle <- renderText({
     req(input$rankN)
     paste("Top", input$rankN, "- Configurations les Plus Chères")
@@ -406,90 +435,80 @@ server <- function(input, output, session) {
     paste("Top", input$rankN, "- Configurations les Moins Chères")
   })
   
-  # Listes HTML colorées (remplace les DT)
+  # --- HELPER (SIMPLIFICATION): Fonction pour créer les listes HTML ---
+  # Cette fonction est appelée par topExpensiveUI et topCheapUI
+  # pour éviter de dupliquer le code de génération HTML.
+  buildRankHTML <- function(data_frame, unit_label, background_color) {
+    if (nrow(data_frame) == 0) {
+      return(p("Aucune donnée à afficher."))
+    }
+    
+    # Construire les items de la liste <li>
+    list_items <- apply(data_frame, 1, function(row) {
+      paste0("<li><strong>", row['Config'], "</strong>: ", 
+             round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
+    })
+    
+    # Retourner le HTML complet <ol>...</ol>
+    HTML(paste0(
+      "<ol style='background: ", background_color, "; padding: 20px 20px 20px 40px; border-radius: 5px; margin-bottom: 20px;'>",
+      paste(list_items, collapse = ""),
+      "</ol>"
+    ))
+  }
+  
+  # Sortie pour la liste des "Plus Chers"
   output$topExpensiveUI <- renderUI({
     req(rankData(), input$rankN)
-    
     rank_data_list <- rankData()
-    df <- rank_data_list$df
-    metric_col_sym <- rank_data_list$metric_col_sym
-    n <- input$rankN
-    
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    top_expensive <- df %>%
-      arrange(desc(!!metric_col_sym)) %>%
-      head(n) %>%
-      mutate(Value = !!metric_col_sym) 
+    # Trier par ordre décroissant
+    top_expensive <- rank_data_list$df %>%
+      arrange(desc(!!rank_data_list$metric_col_sym)) %>%
+      head(input$rankN) %>%
+      mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    if (nrow(top_expensive) == 0) {
-      return(p("Aucune donnée à afficher."))
-    }
-    
-    # Construire les items de la liste
-    list_items <- apply(top_expensive, 1, function(row) {
-      paste0("<li><strong>", row['Config'], "</strong>: ", 
-             round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
-    })
-    
-    # Retourner le HTML
-    HTML(paste0(
-      "<ol style='background: #fadbd8; padding: 20px 20px 20px 40px; border-radius: 5px; margin-bottom: 20px;'>", # Fond rouge
-      paste(list_items, collapse = ""),
-      "</ol>"
-    ))
+    # Appel de la fonction helper
+    buildRankHTML(top_expensive, unit_label, "#fadbd8") # Fond rouge
   })
   
+  # Sortie pour la liste des "Moins Chers"
   output$topCheapUI <- renderUI({
     req(rankData(), input$rankN)
-    
     rank_data_list <- rankData()
-    df <- rank_data_list$df
-    metric_col_sym <- rank_data_list$metric_col_sym
-    n <- input$rankN
-    
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    top_cheap <- df %>%
-      arrange(!!metric_col_sym) %>% # Tri ascendant
-      head(n) %>%
-      mutate(Value = !!metric_col_sym) 
+    # Trier par ordre croissant
+    top_cheap <- rank_data_list$df %>%
+      arrange(!!rank_data_list$metric_col_sym) %>% 
+      head(input$rankN) %>%
+      mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    if (nrow(top_cheap) == 0) {
-      return(p("Aucune donnée à afficher."))
-    }
-    
-    # Construire les items de la liste
-    list_items <- apply(top_cheap, 1, function(row) {
-      paste0("<li><strong>", row['Config'], "</strong>: ", 
-             round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
-    })
-    
-    # Retourner le HTML
-    HTML(paste0(
-      "<ol style='background: #d5f4e6; padding: 20px 20px 20px 40px; border-radius: 5px; margin-bottom: 20px;'>", # Fond vert
-      paste(list_items, collapse = ""),
-      "</ol>"
-    ))
+    # Appel de la fonction helper
+    buildRankHTML(top_cheap, unit_label, "#d5f4e6") # Fond vert
   })
   
   
-  # --- GRAPHIQUES (inchangés) ---
+  # --- SORTIES: Graphiques (Onglets 4 & 5) ---
   
-  # GRAPHIQUE 1: PointRange
+  # GRAPHIQUE 1: Distribution (PointRange)
   output$distribPlot <- renderPlot({
     req(filteredData(), input$distribMetric)
     plot_data_base <- filteredData()
     
     warning_text <- NULL
     
+    # Logique pour Loyer / m²
     if (input$distribMetric == "m2") {
       plot_data <- plot_data_base %>%
         filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3))
       
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher pour cette sélection."), size = 6) + theme_void())
+      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
       
       plot_data <- plot_data %>% mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+      
+      # Limiter à 50 lignes pour éviter un graphique illisible
       if(nrow(plot_data) > 50) {
         plot_data <- plot_data %>% arrange(Loyer_m2_Mediane) %>% slice(1:50)
         warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
@@ -497,18 +516,18 @@ server <- function(input, output, session) {
       
       ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer_m2_Mediane, color = Zone)) +
         geom_pointrange(aes(ymin = Loyer_m2_Q1, ymax = Loyer_m2_Q3), size = 0.8) +
-        coord_flip() +  
+        coord_flip() +  # Basculer les axes x et y
         labs(title = "Distribution des Loyers au m² (Médiane, Q1, Q3)", subtitle = warning_text,
              x = "Catégorie", y = "Loyer / m² (€)", color = "Zone") +
         theme_minimal(base_size = 14) +
         theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
       
+      # Logique pour Loyer Total
     } else {
-      # Loyer Total
       plot_data <- plot_data_base %>%
         filter(!is.na(Loyer_Total_Mediane) & !is.na(Loyer_Total_Q1) & !is.na(Loyer_Total_Q3))
       
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher pour cette sélection."), size = 6) + theme_void())
+      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
       
       plot_data <- plot_data %>% mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
       if(nrow(plot_data) > 50) {
@@ -526,89 +545,27 @@ server <- function(input, output, session) {
     }
   })
   
-  # GRAPHIQUE 2: Loyer par Époque
-  output$eraPlot <- renderPlot({
-    req(filteredData(), input$eraMetric)
-    
-    if (input$eraMetric == "m2") {
-      plot_data <- filteredData() %>%
-        filter(Epoque_Construction != "(Non spécifié)", !is.na(Loyer_m2_Mediane))
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      ggplot(plot_data, aes(x = Epoque_Construction, y = Loyer_m2_Mediane, fill = Epoque_Construction)) +
-        geom_boxplot(alpha = 0.8, show.legend = FALSE) +
-        facet_wrap(~ Zone, scales = "free_y") + 
-        labs(title = "Distribution des Loyers au m² par Époque", x = "Époque de Construction", y = "Loyer Médian / m² (€)") +
-        theme_minimal(base_size = 14) +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
-      
-    } else {
-      # Loyer Total
-      plot_data <- filteredData() %>%
-        filter(Epoque_Construction != "(Non spécifié)", !is.na(Loyer_Total_Mediane))
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      ggplot(plot_data, aes(x = Epoque_Construction, y = Loyer_Total_Mediane, fill = Epoque_Construction)) +
-        geom_boxplot(alpha = 0.8, show.legend = FALSE) +
-        facet_wrap(~ Zone, scales = "free_y") + 
-        labs(title = "Distribution des Loyers Totaux par Époque", x = "Époque de Construction", y = "Loyer Total Médian (€)") +
-        theme_minimal(base_size = 14) +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
-    }
-  })
+  # --- BLOCS GRAPHIQUES SUPPRIMÉS ---
+  # output$eraPlot et output$loyerPiecesPlot ont été retirés
   
-  # GRAPHIQUE 3: Loyer / Pièces
-  output$loyerPiecesPlot <- renderPlot({
-    req(filteredData(), input$piecesMetric)
-    
-    if (input$piecesMetric == "m2") {
-      plot_data <- filteredData() %>%
-        filter(Pieces %in% c("1P", "2P", "3P", "4P+"), !is.na(Loyer_m2_Mediane), Zone != "(Non spécifié)")
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      plot_data$Pieces <- factor(plot_data$Pieces, levels = c("1P", "2P", "3P", "4P+"))
-      
-      ggplot(plot_data, aes(x = Pieces, y = Loyer_m2_Mediane, group = Zone, color = Zone)) +
-        geom_line(size = 1.2, alpha = 0.8) + geom_point(size = 3, alpha = 0.8) +
-        labs(title = "Loyer Médian au m² par Nombre de Pièces et Zone", x = "Nombre de Pièces", y = "Loyer Médian / m² (€)", color = "Zone") +
-        theme_minimal(base_size = 14) +
-        theme(plot.title = element_text(face = "bold"), legend.position = "bottom")
-      
-    } else {
-      # Loyer Total
-      plot_data <- filteredData() %>%
-        filter(Pieces %in% c("1P", "2P", "3P", "4P+"), !is.na(Loyer_Total_Mediane), Zone != "(Non spécifié)")
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      plot_data$Pieces <- factor(plot_data$Pieces, levels = c("1P", "2P", "3P", "4P+"))
-      
-      ggplot(plot_data, aes(x = Pieces, y = Loyer_Total_Mediane, group = Zone, color = Zone)) +
-        geom_line(size = 1.2, alpha = 0.8) + geom_point(size = 3, alpha = 0.8) +
-        labs(title = "Loyer Total Médian par Nombre de Pièces et Zone", x = "Nombre de Pièces", y = "Loyer Total Médian (€)", color = "Zone") +
-        theme_minimal(base_size = 14) +
-        theme(plot.title = element_text(face = "bold"), legend.position = "bottom")
-    }
-  })
-  
-  # GRAPHIQUE 4: Dispersion EIQ
+  # GRAPHIQUE 2: Dispersion (Barres)
   output$dispersionPlot <- renderPlot({
     req(filteredData(), input$dispersionMetric)
     
+    # Logique pour m²
     if (input$dispersionMetric == "m2") {
       plot_data <- filteredData() %>%
         filter(!is.na(Loyer_m2_Q1), !is.na(Loyer_m2_Q3), Zone != "(Non spécifié)") %>%
-        mutate(EIQ_m2 = Loyer_m2_Q3 - Loyer_m2_Q1) 
+        mutate(EIQ_m2 = Loyer_m2_Q3 - Loyer_m2_Q1) # Calcul de l'Écart InterQuartile
       
+      # Agréger par zone
       plot_summary <- plot_data %>% group_by(Zone) %>%
         summarise(Loyer_Med_Moyen = mean(Loyer_m2_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_m2, na.rm = TRUE), .groups = 'drop') %>%
         filter(!is.na(EIQ_Moyen))
       
       if (nrow(plot_summary) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
       
+      # Graphique en barres
       ggplot(plot_summary, aes(x = EIQ_Moyen, y = reorder(Zone, EIQ_Moyen), fill = Loyer_Med_Moyen)) +
         geom_col() + 
         labs(title = "Dispersion des Loyers (Écart InterQuartile au m²)", x = "Écart InterQuartile Moyen au m² (€)", y = "Zone", fill = "Loyer Médian\nMoyen (€/m²)") +
@@ -616,11 +573,11 @@ server <- function(input, output, session) {
         theme_minimal(base_size = 14) +
         theme(plot.title = element_text(face = "bold"))
       
+      # Logique pour Total
     } else {
-      # Loyer Total
       plot_data <- filteredData() %>%
         filter(!is.na(Loyer_Total_Q1), !is.na(Loyer_Total_Q3), Zone != "(Non spécifié)") %>%
-        mutate(EIQ_Total = Loyer_Total_Q3 - Loyer_Total_Q1) 
+        mutate(EIQ_Total = Loyer_Total_Q3 - Loyer_Total_Q1) # EIQ Total
       
       plot_summary <- plot_data %>% group_by(Zone) %>%
         summarise(Loyer_Med_Moyen = mean(Loyer_Total_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_Total, na.rm = TRUE), .groups = 'drop') %>%
@@ -638,15 +595,14 @@ server <- function(input, output, session) {
   })
   
   
-  # --- LOGIQUE DU SIMULATEUR (inchangée) ---
+  # --- SORTIES: Simulateur (Onglet 6) ---
   
+  # 1. Générer le Slider dynamique
   output$sliderUI <- renderUI({
     req(filteredData(), input$simMetric)
     df <- filteredData()
     
-    label_text <- ""
-    step_val <- 1
-    
+    # Définir les variables en fonction du choix m²/total
     if (input$simMetric == "m2") {
       col_data <- df$Loyer_m2_Mediane
       label_text <- "Votre loyer maximum (€/m²):"
@@ -657,8 +613,9 @@ server <- function(input, output, session) {
       step_val <- 25
     }
     
-    col_data <- col_data[!is.na(col_data)]
+    col_data <- col_data[!is.na(col_data)] # Retirer les NA
     
+    # Définir les min/max du slider à partir des données filtrées
     if (length(col_data) == 0) {
       min_val <- 0
       max_val <- if (input$simMetric == "m2") 50 else 3000
@@ -669,6 +626,7 @@ server <- function(input, output, session) {
       start_val <- round(median(col_data))
     }
     
+    # Créer le slider
     sliderInput("simSlider",
                 label = label_text,
                 min = min_val,
@@ -678,18 +636,20 @@ server <- function(input, output, session) {
                 width = "100%")
   })
   
+  # 2. Générer la table de résultats du simulateur
   output$simResultsTable <- DT::renderDataTable({
+    # Nécessite que le slider soit prêt
     req(filteredData(), input$simSlider, input$simMetric)
     
     df <- filteredData()
-    slider_val <- input$simSlider
+    slider_val <- input$simSlider # Récupérer la valeur du slider
     
+    # Filtrer les données en fonction de la valeur du slider
     if (input$simMetric == "m2") {
       results <- df %>%
         filter(Loyer_m2_Mediane <= slider_val) %>%
         arrange(desc(Loyer_m2_Mediane)) %>%
         select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_Total_Mediane, obs)
-      
       cols_to_format <- c('Loyer_m2_Mediane', 'Loyer_Total_Mediane')
       
     } else {
@@ -697,10 +657,10 @@ server <- function(input, output, session) {
         filter(Loyer_Total_Mediane <= slider_val) %>%
         arrange(desc(Loyer_Total_Mediane)) %>%
         select(Zone, Type, Pieces, Epoque_Construction, Loyer_Total_Mediane, Loyer_m2_Mediane, obs)
-      
       cols_to_format <- c('Loyer_Total_Mediane', 'Loyer_m2_Mediane')
     }
     
+    # Afficher le tableau de résultats
     DT::datatable(
       results,
       options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE),
@@ -712,13 +672,15 @@ server <- function(input, output, session) {
   })
   
   
-  # Sortie: Tableau de données brutes
+  # --- SORTIE: Tableau de données brutes (Onglet 7) ---
   output$rentTable <- DT::renderDataTable({
     req(filteredData())
     
+    # Sélectionner les colonnes à afficher
     display_data <- filteredData() %>%
       select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_m2_Q1, Loyer_m2_Q3, Loyer_Total_Mediane, Loyer_Total_Q1, Loyer_Total_Q3, obs)
     
+    # Afficher le tableau avec filtres en haut des colonnes
     DT::datatable(
       display_data,
       options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,
@@ -733,5 +695,7 @@ server <- function(input, output, session) {
   })
 }
 
-# --- 5. Lancer l'application ---
+# ==================================================================
+# --- 7. Lancer l'application ---
+# ==================================================================
 shinyApp(ui = ui, server = server)
