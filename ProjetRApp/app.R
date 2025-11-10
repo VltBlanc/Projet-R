@@ -1,7 +1,7 @@
 #
-# Application Shiny pour les loyers - Version 5
-# Ajout d'un onglet "Classements" dédié et personnalisable
-# CORRECTION : Rétablissement du texte dans "Définitions"
+# Application Shiny pour les loyers - Version 6
+# Modification de l'onglet "Classements" :
+# Remplacement des DT (interactifs) par des listes UI (HTML coloré)
 #
 
 # --- 1. Charger les bibliothèques ---
@@ -108,7 +108,7 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       tabsetPanel(
-        # --- Onglet Définitions (TEXTE CORRIGÉ) ---
+        # --- Onglet Définitions (inchangé) ---
         tabPanel("Définitions",
                  br(),
                  fluidRow(
@@ -151,6 +151,7 @@ ui <- fluidPage(
                  uiOutput("summaryStats")
         ),
         
+        # --- MODIFIÉ : Onglet Classements ---
         tabPanel("Classements",
                  br(),
                  fluidRow(
@@ -168,15 +169,16 @@ ui <- fluidPage(
                  fluidRow(
                    column(6,
                           h4(textOutput("rankExpensiveTitle", inline = TRUE)),
-                          DT::dataTableOutput("topExpensiveTable")
+                          uiOutput("topExpensiveUI") # Modifié de DT::dataTableOutput
                    ),
                    column(6,
                           h4(textOutput("rankCheapTitle", inline = TRUE)),
-                          DT::dataTableOutput("topCheapTable")
+                          uiOutput("topCheapUI") # Modifié de DT::dataTableOutput
                    )
                  )
         ),
         
+        # --- Graphiques (inchangés) ---
         tabPanel("Distribution des Loyers",
                  br(),
                  radioButtons("distribMetric", "Choisir la métrique:",
@@ -213,7 +215,7 @@ ui <- fluidPage(
                  plotOutput("dispersionPlot", height = "600px")
         ),
         
-        # --- Simulateur (TEXTE CORRIGÉ) ---
+        # --- Simulateur (inchangé) ---
         tabPanel("Simulateur de Loyer",
                  br(),
                  fluidRow(
@@ -378,9 +380,9 @@ server <- function(input, output, session) {
     ))
   })
   
-  # --- SORTIES : CLASSEMENTS ---
+  # --- MODIFIÉ : SORTIES CLASSEMENTS (HTML) ---
   
-  # Réactive pour les données de classement
+  # Réactive pour les données de classement (inchangée)
   rankData <- reactive({
     req(filteredData(), input$rankMetric)
     
@@ -393,7 +395,7 @@ server <- function(input, output, session) {
     list(df = df, metric_col_sym = metric_col_sym)
   })
   
-  # Titres dynamiques pour les classements
+  # Titres dynamiques pour les classements (Correction d'un bug V5)
   output$rankExpensiveTitle <- renderText({
     req(input$rankN)
     paste("Top", input$rankN, "- Configurations les Plus Chères")
@@ -401,52 +403,74 @@ server <- function(input, output, session) {
   
   output$rankCheapTitle <- renderText({
     req(input$rankN)
-    paste("Top", inputV$rankN, "- Configurations les Moins Chères")
+    paste("Top", input$rankN, "- Configurations les Moins Chères")
   })
   
-  # Tableaux des classements
-  output$topExpensiveTable <- DT::renderDataTable({
+  # Listes HTML colorées (remplace les DT)
+  output$topExpensiveUI <- renderUI({
     req(rankData(), input$rankN)
     
-    rank_data <- rankData()
+    rank_data_list <- rankData()
+    df <- rank_data_list$df
+    metric_col_sym <- rank_data_list$metric_col_sym
+    n <- input$rankN
     
-    results <- rank_data$df %>%
-      arrange(desc(!!rank_data$metric_col_sym)) %>%
-      head(input$rankN) %>%
-      select(Configuration = Config, 
-             `Loyer (€/m²)` = Loyer_m2_Mediane, 
-             `Loyer Total (€)` = Loyer_Total_Mediane, 
-             Observations = obs)
+    unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    DT::datatable(
-      results,
-      options = list(pageLength = input$rankN, dom = 't', ordering = FALSE), # dom='t' (table), ordering=FALSE
-      rownames = FALSE
-    ) %>%
-      DT::formatRound(columns = c('Loyer (€/m²)', 'Loyer Total (€)'), digits = 2) %>%
-      DT::formatRound(columns = 'Observations', digits = 0)
+    top_expensive <- df %>%
+      arrange(desc(!!metric_col_sym)) %>%
+      head(n) %>%
+      mutate(Value = !!metric_col_sym) 
+    
+    if (nrow(top_expensive) == 0) {
+      return(p("Aucune donnée à afficher."))
+    }
+    
+    # Construire les items de la liste
+    list_items <- apply(top_expensive, 1, function(row) {
+      paste0("<li><strong>", row['Config'], "</strong>: ", 
+             round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
+    })
+    
+    # Retourner le HTML
+    HTML(paste0(
+      "<ol style='background: #fadbd8; padding: 20px 20px 20px 40px; border-radius: 5px; margin-bottom: 20px;'>", # Fond rouge
+      paste(list_items, collapse = ""),
+      "</ol>"
+    ))
   })
   
-  output$topCheapTable <- DT::renderDataTable({
+  output$topCheapUI <- renderUI({
     req(rankData(), input$rankN)
     
-    rank_data <- rankData()
+    rank_data_list <- rankData()
+    df <- rank_data_list$df
+    metric_col_sym <- rank_data_list$metric_col_sym
+    n <- input$rankN
     
-    results <- rank_data$df %>%
-      arrange(!!rank_data$metric_col_sym) %>% # Tri ascendant
-      head(input$rankN) %>%
-      select(Configuration = Config, 
-             `Loyer (€/m²)` = Loyer_m2_Mediane, 
-             `Loyer Total (€)` = Loyer_Total_Mediane, 
-             Observations = obs)
+    unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    DT::datatable(
-      results,
-      options = list(pageLength = input$rankN, dom = 't', ordering = FALSE), # dom='t' (table), ordering=FALSE
-      rownames = FALSE
-    ) %>%
-      DT::formatRound(columns = c('Loyer (€/m²)', 'Loyer Total (€)'), digits = 2) %>%
-      DT::formatRound(columns = 'Observations', digits = 0)
+    top_cheap <- df %>%
+      arrange(!!metric_col_sym) %>% # Tri ascendant
+      head(n) %>%
+      mutate(Value = !!metric_col_sym) 
+    
+    if (nrow(top_cheap) == 0) {
+      return(p("Aucune donnée à afficher."))
+    }
+    
+    # Construire les items de la liste
+    list_items <- apply(top_cheap, 1, function(row) {
+      paste0("<li><strong>", row['Config'], "</strong>: ", 
+             round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
+    })
+    
+    # Retourner le HTML
+    HTML(paste0(
+      "<ol style='background: #d5f4e6; padding: 20px 20px 20px 40px; border-radius: 5px; margin-bottom: 20px;'>", # Fond vert
+      paste(list_items, collapse = ""),
+      "</ol>"
+    ))
   })
   
   
