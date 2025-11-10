@@ -1,7 +1,7 @@
 #
-# Application Shiny pour les loyers - Version 3
-# Regroupement des graphiques (Loyer m² vs Loyer Total) via radioButtons
-# Ajout d'un onglet "Simulateur de Loyer" avec slider dynamique
+# Application Shiny pour les loyers - Version 5
+# Ajout d'un onglet "Classements" dédié et personnalisable
+# CORRECTION : Rétablissement du texte dans "Définitions"
 #
 
 # --- 1. Charger les bibliothèques ---
@@ -57,7 +57,6 @@ data <- data %>%
     Loyer_Total_Mediane = Médiane.1,
     Loyer_Total_Q3 = Q3.1,
     Loyer_Total_Moyenne = Moyenne.1
-    # 'obs' est déjà au bon nom si 'check.names = TRUE' est utilisé
   ) %>%
   mutate(
     across(starts_with("Loyer_") | "obs", as.numeric)
@@ -109,7 +108,7 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       tabsetPanel(
-        # --- Onglet Définitions (inchangé) ---
+        # --- Onglet Définitions (TEXTE CORRIGÉ) ---
         tabPanel("Définitions",
                  br(),
                  fluidRow(
@@ -142,12 +141,42 @@ ui <- fluidPage(
                    )
                  )
         ),
+        
         tabPanel("Statistiques Résumées",
                  br(),
+                 radioButtons("statsMetric", "Choisir la métrique:",
+                              choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
+                              selected = "m2", inline = TRUE),
+                 hr(),
                  uiOutput("summaryStats")
         ),
         
-        # --- GRAPHIQUES MODIFIÉS ---
+        tabPanel("Classements",
+                 br(),
+                 fluidRow(
+                   column(5,
+                          radioButtons("rankMetric", "Classer selon:",
+                                       choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
+                                       selected = "m2", inline = TRUE)
+                   ),
+                   column(4,
+                          numericInput("rankN", "Nombre de résultats à afficher:",
+                                       value = 10, min = 3, max = 100, step = 1, width = "200px")
+                   )
+                 ),
+                 hr(),
+                 fluidRow(
+                   column(6,
+                          h4(textOutput("rankExpensiveTitle", inline = TRUE)),
+                          DT::dataTableOutput("topExpensiveTable")
+                   ),
+                   column(6,
+                          h4(textOutput("rankCheapTitle", inline = TRUE)),
+                          DT::dataTableOutput("topCheapTable")
+                   )
+                 )
+        ),
+        
         tabPanel("Distribution des Loyers",
                  br(),
                  radioButtons("distribMetric", "Choisir la métrique:",
@@ -184,7 +213,7 @@ ui <- fluidPage(
                  plotOutput("dispersionPlot", height = "600px")
         ),
         
-        # --- NOUVEL ONGLET : SIMULATEUR ---
+        # --- Simulateur (TEXTE CORRIGÉ) ---
         tabPanel("Simulateur de Loyer",
                  br(),
                  fluidRow(
@@ -244,13 +273,13 @@ server <- function(input, output, session) {
     return(df)
   })
   
-  # Sortie: Statistiques Résumées (basé sur le m² par défaut)
+  # --- Sortie: Statistiques Résumées (Simplifiée) ---
   output$summaryStats <- renderUI({
-    req(filteredData())
+    req(filteredData(), input$statsMetric) 
     
     df_plot <- filteredData()
     
-    # Calculer le nombre total de CONTRATS
+    # --- 1. Calcul des contrats (inchangé) ---
     df_for_contracts <- data 
     df_for_contracts <- df_for_contracts %>% filter(Zone %in% input$zoneFilter)
     
@@ -279,46 +308,54 @@ server <- function(input, output, session) {
       total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
     }
     
+    # --- 2. Définition des variables dynamiques ---
+    metric_col_sym <- if (input$statsMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
+    unit_label <- if (input$statsMetric == "m2") "€/m²" else "€"
+    title_label <- if (input$statsMetric == "m2") paste0("Loyer Moyen par Zone (", unit_label, ")") else paste0("Loyer Total Moyen par Zone (", unit_label, ")")
     
-    # Calculer les statistiques pour les classements (basé m²)
-    stats_by_zone <- df_plot %>%
-      filter(!is.na(Loyer_m2_Mediane)) %>%
+    # --- 3. Calculs statistiques dynamiques ---
+    df_stats <- df_plot %>% filter(!is.na(!!metric_col_sym))
+    
+    # Gestion si aucune donnée n'est disponible
+    if (nrow(df_stats) == 0) {
+      return(HTML(paste0(
+        "<div style='padding: 20px;'>",
+        "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
+        "<div style='background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>",
+        "<p><strong>Nombre total de contrats de locations (base):</strong> ", format(total_contracts, big.mark = " "), "</p>",
+        "</div>",
+        "<p>Aucune donnée statistique à afficher pour cette sélection (", unit_label, ").</p>",
+        "</div>"
+      )))
+    }
+    
+    stats_by_zone <- df_stats %>%
       group_by(Zone) %>%
       summarise(
-        Loyer_Moyen = round(mean(Loyer_m2_Mediane, na.rm = TRUE), 2),
-        Loyer_Min = round(min(Loyer_m2_Mediane, na.rm = TRUE), 2),
-        Loyer_Max = round(max(Loyer_m2_Mediane, na.rm = TRUE), 2),
+        Loyer_Moyen = round(mean(!!metric_col_sym, na.rm = TRUE), 2),
+        Loyer_Min = round(min(!!metric_col_sym, na.rm = TRUE), 2),
+        Loyer_Max = round(max(!!metric_col_sym, na.rm = TRUE), 2),
         N_Observations = n(),
         .groups = 'drop'
       ) %>%
       arrange(desc(Loyer_Moyen))
     
-    top_expensive <- df_plot %>%
-      filter(!is.na(Loyer_m2_Mediane)) %>%
-      arrange(desc(Loyer_m2_Mediane)) %>%
-      head(5) %>%
-      mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-    
-    top_cheap <- df_plot %>%
-      filter(!is.na(Loyer_m2_Mediane)) %>%
-      arrange(Loyer_m2_Mediane) %>%
-      head(5) %>%
-      mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-    
     total_combinations <- nrow(df_plot)
-    complete_combinations <- sum(!is.na(df_plot$Loyer_m2_Mediane))
+    complete_combinations <- nrow(df_stats)
     completeness <- if (total_combinations > 0) round(complete_combinations / total_combinations * 100, 1) else 0
     
-    # Créer l'HTML (inchangé)
+    # --- 4. Génération HTML (simplifiée) ---
     HTML(paste0(
       "<div style='padding: 20px;'>",
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
       "<div style='background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>",
       "<p><strong>Nombre total de contrats de locations (base):</strong> ", format(total_contracts, big.mark = " "), "</p>",
-      "<p><strong>Nombre de combinaisons statistiques:</strong> ", total_combinations, "</p>",
-      "<p><strong>Combinaisons avec loyer:</strong> ", complete_combinations, " (", completeness, "%)</p>",
+      "<p><strong>Nombre de combinaisons statistiques (filtres):</strong> ", total_combinations, "</p>",
+      "<p><strong>Combinaisons avec loyer (", input$statsMetric, "):</strong> ", complete_combinations, " (", completeness, "%)</p>", 
       "</div>",
-      "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Loyer Moyen par Zone (€/m²)</h3>",
+      
+      "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>", title_label, "</h3>", 
+      
       "<table style='width: 100%; border-collapse: collapse; margin-bottom: 30px;'>",
       "<tr style='background: #3498db; color: white;'>",
       "<th style='padding: 10px; text-align: left;'>Zone</th>",
@@ -330,30 +367,92 @@ server <- function(input, output, session) {
       paste0(apply(stats_by_zone, 1, function(row) {
         paste0("<tr style='border-bottom: 1px solid #ddd;'>",
                "<td style='padding: 8px;'>", row['Zone'], "</td>",
-               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Moyen'], " €</td>",
-               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Min'], " €</td>",
-               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Max'], " €</td>",
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Moyen'], " ", unit_label, "</td>", 
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Min'], " ", unit_label, "</td>", 
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Max'], " ", unit_label, "</td>", 
                "<td style='padding: 8px; text-align: right;'>", row['N_Observations'], "</td>",
                "</tr>")
       }), collapse = ""),
       "</table>",
-      "<h3 style='color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;'>Top 5 - Configurations les Plus Chères (au m²)</h3>",
-      "<ol style='background: #fadbd8; padding: 20px; border-radius: 5px; margin-bottom: 20px;'>",
-      paste0(apply(top_expensive, 1, function(row) {
-        paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
-      }), collapse = ""),
-      "</ol>",
-      "<h3 style='color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px;'>Top 5 - Configurations les Moins Chères (au m²)</h3>",
-      "<ol style='background: #d5f4e6; padding: 20px; border-radius: 5px;'>",
-      paste0(apply(top_cheap, 1, function(row) {
-        paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
-      }), collapse = ""),
-      "</ol>",
       "</div>"
     ))
   })
   
-  # --- GRAPHIQUE 1: PointRange (Distributions) ---
+  # --- SORTIES : CLASSEMENTS ---
+  
+  # Réactive pour les données de classement
+  rankData <- reactive({
+    req(filteredData(), input$rankMetric)
+    
+    metric_col_sym <- if (input$rankMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
+    
+    df <- filteredData() %>%
+      filter(!is.na(!!metric_col_sym)) %>%
+      mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+    
+    list(df = df, metric_col_sym = metric_col_sym)
+  })
+  
+  # Titres dynamiques pour les classements
+  output$rankExpensiveTitle <- renderText({
+    req(input$rankN)
+    paste("Top", input$rankN, "- Configurations les Plus Chères")
+  })
+  
+  output$rankCheapTitle <- renderText({
+    req(input$rankN)
+    paste("Top", inputV$rankN, "- Configurations les Moins Chères")
+  })
+  
+  # Tableaux des classements
+  output$topExpensiveTable <- DT::renderDataTable({
+    req(rankData(), input$rankN)
+    
+    rank_data <- rankData()
+    
+    results <- rank_data$df %>%
+      arrange(desc(!!rank_data$metric_col_sym)) %>%
+      head(input$rankN) %>%
+      select(Configuration = Config, 
+             `Loyer (€/m²)` = Loyer_m2_Mediane, 
+             `Loyer Total (€)` = Loyer_Total_Mediane, 
+             Observations = obs)
+    
+    DT::datatable(
+      results,
+      options = list(pageLength = input$rankN, dom = 't', ordering = FALSE), # dom='t' (table), ordering=FALSE
+      rownames = FALSE
+    ) %>%
+      DT::formatRound(columns = c('Loyer (€/m²)', 'Loyer Total (€)'), digits = 2) %>%
+      DT::formatRound(columns = 'Observations', digits = 0)
+  })
+  
+  output$topCheapTable <- DT::renderDataTable({
+    req(rankData(), input$rankN)
+    
+    rank_data <- rankData()
+    
+    results <- rank_data$df %>%
+      arrange(!!rank_data$metric_col_sym) %>% # Tri ascendant
+      head(input$rankN) %>%
+      select(Configuration = Config, 
+             `Loyer (€/m²)` = Loyer_m2_Mediane, 
+             `Loyer Total (€)` = Loyer_Total_Mediane, 
+             Observations = obs)
+    
+    DT::datatable(
+      results,
+      options = list(pageLength = input$rankN, dom = 't', ordering = FALSE), # dom='t' (table), ordering=FALSE
+      rownames = FALSE
+    ) %>%
+      DT::formatRound(columns = c('Loyer (€/m²)', 'Loyer Total (€)'), digits = 2) %>%
+      DT::formatRound(columns = 'Observations', digits = 0)
+  })
+  
+  
+  # --- GRAPHIQUES (inchangés) ---
+  
+  # GRAPHIQUE 1: PointRange
   output$distribPlot <- renderPlot({
     req(filteredData(), input$distribMetric)
     plot_data_base <- filteredData()
@@ -403,7 +502,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # --- GRAPHIQUE 2: Loyer par Époque ---
+  # GRAPHIQUE 2: Loyer par Époque
   output$eraPlot <- renderPlot({
     req(filteredData(), input$eraMetric)
     
@@ -436,7 +535,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # --- GRAPHIQUE 3: Loyer / Pièces ---
+  # GRAPHIQUE 3: Loyer / Pièces
   output$loyerPiecesPlot <- renderPlot({
     req(filteredData(), input$piecesMetric)
     
@@ -471,7 +570,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # --- GRAPHIQUE 4: Dispersion EIQ ---
+  # GRAPHIQUE 4: Dispersion EIQ
   output$dispersionPlot <- renderPlot({
     req(filteredData(), input$dispersionMetric)
     
@@ -497,7 +596,7 @@ server <- function(input, output, session) {
       # Loyer Total
       plot_data <- filteredData() %>%
         filter(!is.na(Loyer_Total_Q1), !is.na(Loyer_Total_Q3), Zone != "(Non spécifié)") %>%
-        mutate(EIQ_Total = Loyer_Total_Q3 - Loyer_Total_Q1) # Calcul de l'Écart InterQuartile Total
+        mutate(EIQ_Total = Loyer_Total_Q3 - Loyer_Total_Q1) 
       
       plot_summary <- plot_data %>% group_by(Zone) %>%
         summarise(Loyer_Med_Moyen = mean(Loyer_Total_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_Total, na.rm = TRUE), .groups = 'drop') %>%
@@ -515,9 +614,8 @@ server <- function(input, output, session) {
   })
   
   
-  # --- LOGIQUE DU SIMULATEUR ---
+  # --- LOGIQUE DU SIMULATEUR (inchangée) ---
   
-  # 1. Générer le Slider (UI dynamique)
   output$sliderUI <- renderUI({
     req(filteredData(), input$simMetric)
     df <- filteredData()
@@ -538,7 +636,6 @@ server <- function(input, output, session) {
     col_data <- col_data[!is.na(col_data)]
     
     if (length(col_data) == 0) {
-      # Valeurs par défaut si aucune donnée
       min_val <- 0
       max_val <- if (input$simMetric == "m2") 50 else 3000
       start_val <- if (input$simMetric == "m2") 25 else 1000
@@ -557,9 +654,7 @@ server <- function(input, output, session) {
                 width = "100%")
   })
   
-  # 2. Générer la table de résultats (DataTable)
   output$simResultsTable <- DT::renderDataTable({
-    # Requiert que le slider soit prêt
     req(filteredData(), input$simSlider, input$simMetric)
     
     df <- filteredData()
