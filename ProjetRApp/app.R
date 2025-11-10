@@ -105,7 +105,11 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       tabsetPanel(
-        tabPanel("Graphique (Loyer / m²)", 
+        tabPanel("Statistiques Résumées",
+                 br(),
+                 uiOutput("summaryStats")
+        ),
+        tabPanel("Graphique (Loyer / m²)",
                  br(),
                  plotOutput("rentPlot", height = "600px")
         ),
@@ -117,7 +121,7 @@ ui <- fluidPage(
                  br(),
                  plotOutput("spiderPlot_ggplot", height = "600px")
         ),
-        tabPanel("Données filtrées", 
+        tabPanel("Données filtrées",
                  br(),
                  DT::dataTableOutput("rentTable")
         )
@@ -138,7 +142,7 @@ server <- function(input, output, session) {
       df <- df %>% filter(Zone == input$zoneFilter)
     }
     if (input$typeFilter != "Tous") {
-      df <- df %>% filter(Type == inputinput$typeFilter)
+      df <- df %>% filter(Type == input$typeFilter)
     }
     if (input$piecesFilter != "Tous") {
       df <- df %>% filter(Pieces == input$piecesFilter)
@@ -149,6 +153,88 @@ server <- function(input, output, session) {
     return(df)
   })
   
+  # Sortie: Statistiques Résumées
+  output$summaryStats <- renderUI({
+    df <- filteredData()
+
+    # Calculer les statistiques
+    stats_by_zone <- df %>%
+      filter(!is.na(Loyer_m2_Mediane)) %>%
+      group_by(Zone) %>%
+      summarise(
+        Loyer_Moyen = round(mean(Loyer_m2_Mediane, na.rm = TRUE), 2),
+        Loyer_Min = round(min(Loyer_m2_Mediane, na.rm = TRUE), 2),
+        Loyer_Max = round(max(Loyer_m2_Mediane, na.rm = TRUE), 2),
+        N_Observations = n(),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(Loyer_Moyen))
+
+    # Top 5 configurations les plus chères
+    top_expensive <- df %>%
+      filter(!is.na(Loyer_m2_Mediane)) %>%
+      arrange(desc(Loyer_m2_Mediane)) %>%
+      head(5) %>%
+      mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+
+    # Top 5 configurations les moins chères
+    top_cheap <- df %>%
+      filter(!is.na(Loyer_m2_Mediane)) %>%
+      arrange(Loyer_m2_Mediane) %>%
+      head(5) %>%
+      mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+
+    # Statistiques globales
+    total_obs <- nrow(df)
+    complete_obs <- sum(!is.na(df$Loyer_m2_Mediane))
+    completeness <- round(complete_obs / total_obs * 100, 1)
+
+    # Créer l'HTML
+    HTML(paste0(
+      "<div style='padding: 20px;'>",
+      "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
+      "<div style='background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>",
+      "<p><strong>Nombre total d'observations:</strong> ", total_obs, "</p>",
+      "<p><strong>Observations complètes (avec loyer):</strong> ", complete_obs, " (", completeness, "%)</p>",
+      "</div>",
+
+      "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Loyer Moyen par Zone (€/m²)</h3>",
+      "<table style='width: 100%; border-collapse: collapse; margin-bottom: 30px;'>",
+      "<tr style='background: #3498db; color: white;'>",
+      "<th style='padding: 10px; text-align: left;'>Zone</th>",
+      "<th style='padding: 10px; text-align: right;'>Loyer Moyen</th>",
+      "<th style='padding: 10px; text-align: right;'>Min</th>",
+      "<th style='padding: 10px; text-align: right;'>Max</th>",
+      "<th style='padding: 10px; text-align: right;'>N° Obs</th>",
+      "</tr>",
+      paste0(apply(stats_by_zone, 1, function(row) {
+        paste0("<tr style='border-bottom: 1px solid #ddd;'>",
+               "<td style='padding: 8px;'>", row['Zone'], "</td>",
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Moyen'], " €</td>",
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Min'], " €</td>",
+               "<td style='padding: 8px; text-align: right;'>", row['Loyer_Max'], " €</td>",
+               "<td style='padding: 8px; text-align: right;'>", row['N_Observations'], "</td>",
+               "</tr>")
+      }), collapse = ""),
+      "</table>",
+
+      "<h3 style='color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;'>Top 5 - Configurations les Plus Chères</h3>",
+      "<ol style='background: #fadbd8; padding: 20px; border-radius: 5px; margin-bottom: 20px;'>",
+      paste0(apply(top_expensive, 1, function(row) {
+        paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
+      }), collapse = ""),
+      "</ol>",
+
+      "<h3 style='color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px;'>Top 5 - Configurations les Moins Chères</h3>",
+      "<ol style='background: #d5f4e6; padding: 20px; border-radius: 5px;'>",
+      paste0(apply(top_cheap, 1, function(row) {
+        paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
+      }), collapse = ""),
+      "</ol>",
+      "</div>"
+    ))
+  })
+
   # Données réactives pour les DEUX graphiques araignée
   radarData <- reactive({
     req(data)
