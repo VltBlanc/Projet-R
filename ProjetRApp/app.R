@@ -1,16 +1,13 @@
 #
 # Application Shiny pour les loyers - Version mise à jour
-# Ajout des couleurs de remplissage (pfcol) au graphique fmsb.
+# Suppression des graphiques araignée et ajout de nouvelles analyses.
 #
 
 # --- 1. Charger les bibliothèques ---
 library(shiny)
 library(ggplot2)
 library(dplyr)
-library(DT)           # Pour les tableaux interactifs
-library(fmsb)         # Pour le nouveau graphique araignée
-library(tidyr)        # Pour pivot_wider et replace_na
-library(RColorBrewer) # Pour les palettes de couleurs
+library(DT)        # Pour les tableaux interactifs
 
 # --- 2. Charger et préparer les données ---
 
@@ -31,9 +28,9 @@ if (!file.exists(file_path)) {
 } else {
   # 1. Lire le fichier avec l'encodage latin1
   data <- read.csv(
-    file_path, 
-    sep = ";", 
-    header = TRUE, 
+    file_path,  
+    sep = ";",  
+    header = TRUE,  
     check.names = TRUE,
     stringsAsFactors = FALSE,
     fileEncoding = "latin1"
@@ -89,16 +86,16 @@ ui <- fluidPage(
       width = 3,
       h4("Filtres de sélection"),
       
-      selectInput("zoneFilter", "Périmètre (Zone):", 
+      selectInput("zoneFilter", "Périmètre (Zone):",  
                   choices = all_zones, selected = "Tous"),
       
-      selectInput("typeFilter", "Type de logement:", 
+      selectInput("typeFilter", "Type de logement:",  
                   choices = all_types, selected = "Tous"),
       
-      selectInput("piecesFilter", "Nombre de pièces:", 
+      selectInput("piecesFilter", "Nombre de pièces:",  
                   choices = all_pieces, selected = "Tous"),
       
-      selectInput("epoqueFilter", "Époque de construction:", 
+      selectInput("epoqueFilter", "Époque de construction:",  
                   choices = all_epoque, selected = "Tous")
     ),
     
@@ -113,13 +110,13 @@ ui <- fluidPage(
                  br(),
                  plotOutput("rentPlot", height = "600px")
         ),
-        tabPanel("Graphique Araignée (fmsb)",
+        tabPanel("Loyer / Époque", # NOUVEAU GRAPHIQUE
                  br(),
-                 plotOutput("spiderPlot_fmsb", height = "600px")
+                 plotOutput("eraPlot", height = "600px")
         ),
-        tabPanel("Graphique Araignée (ggplot)",
+        tabPanel("Total vs m²", # NOUVEAU GRAPHIQUE
                  br(),
-                 plotOutput("spiderPlot_ggplot", height = "600px")
+                 plotOutput("scatterPlot", height = "600px")
         ),
         tabPanel("Données filtrées",
                  br(),
@@ -135,7 +132,7 @@ server <- function(input, output, session) {
   
   # Expression réactive pour les filtres standards (Graphique 1 et Tableau)
   filteredData <- reactive({
-    req(data) 
+    req(data)  
     df <- data
     
     if (input$zoneFilter != "Tous") {
@@ -156,7 +153,7 @@ server <- function(input, output, session) {
   # Sortie: Statistiques Résumées
   output$summaryStats <- renderUI({
     df <- filteredData()
-
+    
     # Calculer les statistiques
     stats_by_zone <- df %>%
       filter(!is.na(Loyer_m2_Mediane)) %>%
@@ -169,26 +166,26 @@ server <- function(input, output, session) {
         .groups = 'drop'
       ) %>%
       arrange(desc(Loyer_Moyen))
-
+    
     # Top 5 configurations les plus chères
     top_expensive <- df %>%
       filter(!is.na(Loyer_m2_Mediane)) %>%
       arrange(desc(Loyer_m2_Mediane)) %>%
       head(5) %>%
       mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-
+    
     # Top 5 configurations les moins chères
     top_cheap <- df %>%
       filter(!is.na(Loyer_m2_Mediane)) %>%
       arrange(Loyer_m2_Mediane) %>%
       head(5) %>%
       mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-
+    
     # Statistiques globales
     total_obs <- nrow(df)
     complete_obs <- sum(!is.na(df$Loyer_m2_Mediane))
     completeness <- round(complete_obs / total_obs * 100, 1)
-
+    
     # Créer l'HTML
     HTML(paste0(
       "<div style='padding: 20px;'>",
@@ -197,7 +194,7 @@ server <- function(input, output, session) {
       "<p><strong>Nombre total d'observations:</strong> ", total_obs, "</p>",
       "<p><strong>Observations complètes (avec loyer):</strong> ", complete_obs, " (", completeness, "%)</p>",
       "</div>",
-
+      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Loyer Moyen par Zone (€/m²)</h3>",
       "<table style='width: 100%; border-collapse: collapse; margin-bottom: 30px;'>",
       "<tr style='background: #3498db; color: white;'>",
@@ -217,14 +214,14 @@ server <- function(input, output, session) {
                "</tr>")
       }), collapse = ""),
       "</table>",
-
+      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;'>Top 5 - Configurations les Plus Chères</h3>",
       "<ol style='background: #fadbd8; padding: 20px; border-radius: 5px; margin-bottom: 20px;'>",
       paste0(apply(top_expensive, 1, function(row) {
         paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
       }), collapse = ""),
       "</ol>",
-
+      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px;'>Top 5 - Configurations les Moins Chères</h3>",
       "<ol style='background: #d5f4e6; padding: 20px; border-radius: 5px;'>",
       paste0(apply(top_cheap, 1, function(row) {
@@ -233,42 +230,6 @@ server <- function(input, output, session) {
       "</ol>",
       "</div>"
     ))
-  })
-
-  # Données réactives pour les DEUX graphiques araignée
-  radarData <- reactive({
-    req(data)
-    df <- data
-    
-    # 1. Appliquer les filtres
-    if (input$typeFilter != "Tous") {
-      df <- df %>% filter(Type == input$typeFilter)
-    }
-    if (input$epoqueFilter != "Tous") {
-      df <- df %>% filter(Epoque_Construction == input$epoqueFilter)
-    }
-    if (input$zoneFilter != "Tous") {
-      df <- df %>% filter(Zone == input$zoneFilter)
-    }
-    
-    # 2. Préparer les données
-    df_prepared <- df %>%
-      filter(Pieces %in% c("1P", "2P", "3P", "4P+")) %>%
-      filter(Zone != "(Non spécifié)") %>%
-      filter(!is.na(Loyer_m2_Mediane)) %>%
-      
-      # S'il y a plusieurs entrées (ex: Type="Tous"),
-      # on prend la moyenne pour éviter les duplicats.
-      group_by(Zone, Pieces) %>%
-      summarise(
-        Loyer_m2_Mediane = mean(Loyer_m2_Mediane, na.rm = TRUE),
-        .groups = 'drop' # Enlève le groupement
-      ) %>%
-      
-      # S'assurer que les pièces sont des facteurs dans le bon ordre
-      mutate(Pieces = factor(Pieces, levels = c("1P", "2P", "3P", "4P+")))
-    
-    return(df_prepared)
   })
   
   # Sortie: Graphique 1 (PointRange)
@@ -291,115 +252,58 @@ server <- function(input, output, session) {
     
     ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer_m2_Mediane, color = Zone)) +
       geom_pointrange(aes(ymin = Loyer_m2_Q1, ymax = Loyer_m2_Q3), size = 0.8) +
-      coord_flip() + 
+      coord_flip() +  
       labs(title = "Distribution des Loyers au m² (Médiane, Q1, Q3)", subtitle = warning_text,
            x = "Catégorie", y = "Loyer / m² (€)", color = "Zone") +
       theme_minimal(base_size = 14) +
       theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
   })
   
-  # --- Sortie pour le GRAPHIQUE fmsb (MISE À JOUR) ---
-  output$spiderPlot_fmsb <- renderPlot({
-    
-    plot_data_tidy <- radarData()
-    
-    if (nrow(plot_data_tidy) == 0) {
-      return(plot(NULL, xlim=c(0,1), ylim=c(0,1), main="Aucune donnée", axes=FALSE, xlab="", ylab=""))
-    }
-    
-    # 1. Transformer les données : de long à large
-    df_wide <- plot_data_tidy %>%
-      tidyr::pivot_wider(
-        names_from = Pieces,
-        values_from = Loyer_m2_Mediane
-      )
-    
-    # 2. Isoler les noms et les données numériques
-    zone_names <- df_wide$Zone
-    df_numeric <- df_wide %>% 
-      select("1P", "2P", "3P", "4P+") %>%
-      # Remplacer les NA (si une zone n'a pas de 4P par ex.) par 0
-      mutate(across(everything(), ~tidyr::replace_na(., 0)))
-    
-    # 3. Gérer le cas où il n'y a pas de données après pivot
-    if (nrow(df_numeric) == 0) {
-      return(plot(NULL, xlim=c(0,1), ylim=c(0,1), main="Aucune donnée à afficher", axes=FALSE, xlab="", ylab=""))
-    }
-    
-    # 4. Créer les lignes min/max requises par fmsb
-    max_val <- ceiling(max(df_numeric) * 1.1)
-    if (max_val == 0) max_val <- 10 # Éviter un graphique plat si 0
-    min_val <- 0
-    
-    df_fmsb <- rbind(
-      rep(max_val, 4), # Ligne 1: Max
-      rep(min_val, 4), # Ligne 2: Min
-      df_numeric       # Lignes 3..n: Données
-    )
-    
-    # 5. Couleurs
-    num_zones <- nrow(df_numeric)
-    colors_border <- if(num_zones > 0) brewer.pal(min(max(3, num_zones), 9), "Set1")[1:num_zones] else "black"
-    
-    # --- AJOUT DES COULEURS DE REMPLISSAGE ---
-    # On utilise adjustcolor (de base R) pour ajouter de la transparence
-    colors_fill <- if(num_zones > 0) adjustcolor(colors_border, alpha.f = 0.2) else NA
-    
-    # 6. Dessiner le graphique
-    par(mar=c(1, 1, 1, 1)) # Ajuster les marges
-    radarchart(
-      df_fmsb,
-      axistype = 1, # Étiquettes d'axe au centre
-      
-      # --- Style des polygones ---
-      pcol = colors_border,      # Couleur des lignes
-      pfcol = colors_fill,       # <--- AJOUT ICI (Couleur de remplissage)
-      plwd = 2,                  # Épaisseur des lignes
-      plty = 1,                  # Type de ligne
-      
-      # --- Style de la grille ---
-      cglcol = "grey",           # Couleur de la grille
-      cglty = 1,                 # Type de ligne de la grille
-      axislabcol = "grey",       # Couleur des étiquettes d'axe
-      cglwd = 0.8,               # Épaisseur de la grille
-      
-      # --- Style des étiquettes (1P, 2P...) ---
-      vlcex = 1.2                # Taille de la police
-    )
-    
-    # 7. Ajouter la légende
-    legend(
-      x = 1.0, # Ajuster la position
-      y = 1.2,
-      legend = zone_names,
-      bty = "n", 
-      pch = 20, 
-      col = colors_border, 
-      cex = 1.2,
-      pt.cex = 2
-    )
-  })
-  
-  # Sortie: Graphique 2 (ggplot Araignée)
-  output$spiderPlot_ggplot <- renderPlot({
-    
-    plot_data <- radarData()
+  # --- NOUVEAU GRAPHIQUE 1 : Loyer par Époque ---
+  output$eraPlot <- renderPlot({
+    plot_data <- filteredData() %>%
+      filter(Epoque_Construction != "(Non spécifié)", !is.na(Loyer_m2_Mediane))
     
     if (nrow(plot_data) == 0) {
-      return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
+      return(ggplot() + 
+               geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + 
+               labs(title = "Veuillez désélectionner '(Non spécifié)' pour l'époque de construction.") +
+               theme_void())
     }
     
-    active_filters <- paste("Filtres actifs: Type =", input$typeFilter, "| Epoque =", input$epoqueFilter)
-    
-    ggplot(plot_data, aes(x = Pieces, y = Loyer_m2_Mediane, group = Zone, color = Zone)) +
-      geom_polygon(aes(fill = Zone), alpha = 0.2, size = 1.2) + # ggplot gère alpha directement
-      geom_point(size = 3) +
-      coord_polar(start = 0) +
-      ylim(0, NA) + # L'échelle commence à 0
-      labs(title = "Loyer Médian (€/m²) par Zone et Nombre de Pièces", subtitle = active_filters,
-           x = "", y = "Loyer Médian / m² (€)", color = "Zone", fill = "Zone") +
+    ggplot(plot_data, aes(x = Epoque_Construction, y = Loyer_m2_Mediane, fill = Epoque_Construction)) +
+      geom_boxplot(alpha = 0.8, show.legend = FALSE) +
+      labs(title = "Distribution des Loyers au m² par Époque de Construction",
+           subtitle = "Basé sur les filtres actuels",
+           x = "Époque de Construction",
+           y = "Loyer Médian / m² (€)") +
       theme_minimal(base_size = 14) +
-      theme(legend.position = "bottom", plot.title = element_text(face = "bold"), axis.text.x = element_text(face = "bold"))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  # --- NOUVEAU GRAPHIQUE 2 : Scatter Plot Total vs m² ---
+  output$scatterPlot <- renderPlot({
+    plot_data <- filteredData() %>%
+      filter(!is.na(Loyer_m2_Mediane), !is.na(Loyer_Total_Mediane)) %>%
+      filter(Pieces != "(Non spécifié)", Zone != "(Non spécifié)")
+    
+    if (nrow(plot_data) == 0) {
+      return(ggplot() + 
+               geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + 
+               labs(title = "Veuillez sélectionner des filtres valides.") +
+               theme_void())
+    }
+    
+    ggplot(plot_data, aes(x = Loyer_m2_Mediane, y = Loyer_Total_Mediane)) +
+      geom_point(aes(color = Zone, shape = Pieces), alpha = 0.8, size = 3.5) +
+      labs(title = "Loyer Total vs. Loyer au m²",
+           subtitle = "Coloré par Zone, Forme par Nombre de Pièces",
+           x = "Loyer Médian / m² (€)",
+           y = "Loyer Médian Total (€)",
+           color = "Zone",
+           shape = "Pièces") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "bottom", legend.box = "vertical", plot.title = element_text(face = "bold"))
   })
   
   # Sortie: Tableau
