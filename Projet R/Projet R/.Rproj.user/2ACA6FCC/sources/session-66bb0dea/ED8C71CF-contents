@@ -1,0 +1,87 @@
+---
+title: "Projet R test bdd"
+author: "Hugo Saulig"
+date: "2025-11-08"
+output: html_document
+---
+# Observatoire des Loyers de l’Agglomération Parisienne (OLAP) :
+## Contenu de la base 2024
+### Territoire couvert : 
+  l’ensemble de l’agglomération parisienne (Paris et communes limitrophes).
+
+### Type de données : 
+  loyers réellement pratiqués, collectés et analysés par l’OLAP.
+
+### Variables principales :
+
+####    Périmètre géographique 
+          (zones, arrondissements, secteurs).
+
+####    Typologie des logements : 
+          nombre de pièces, époque de construction, type de location (meublée / non meublée).
+
+####    Indicateurs statistiques :
+
+          Quartiles (Q1, Médiane, Q3)
+
+          Moyenne
+
+          Nombre d’observations (volume d’échantillon)
+
+####    Année de référence : 
+          2024, avec comparaison possible aux années précédentes (2010–2023).
+
+## Variables du jeu de données :
+      périmètre (zone géographique, ex. "zone 1")
+
+      type (ensemble, appart, maison.)
+
+      nop (nombre de pièces)
+
+      epco (époque de construction)
+
+      del2r (délai ou type d’emménagement, ex. "nouv emm")
+      
+      (les loyers mesurées sont au m²)
+      
+      Q1 (premier quartile du loyer,C’est la valeur en dessous de laquelle se trouvent 25 % des observations.)
+
+      Médiane (loyer médian)
+
+      Q3 (troisième quartile,C’est la valeur en dessous de laquelle se trouvent 75 % des observations.)
+
+      Moyenne (loyer moyen)
+
+      obs (nombre d’observations utilisées pour le calcul)
+
+
+```{r setup, message=FALSE, warning=FALSE, echo=FALSE}
+# Charger un fichier CSV
+donnees <- read.csv("Paris2024-annexe-statistique-diffusion.csv",
+                    sep = ";",
+                    fileEncoding = "latin1")
+donnees[donnees == ""] <- NA
+library(dplyr)
+```
+
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+
+#Appartements les plus cher de la zone 1
+z1_cher <- donnees |>
+  filter(périmètre == "zone 1", type == "appart")|>
+  select(nop,obs,epco,Q1,Médiane,Q3,Moyenne) |>
+  arrange(desc(Médiane))
+  
+z1_cher
+
+#selection de toutes les données ou le nb de pieces figurent
+nb_pieces <- donnees|>
+  filter(!is.na(nop) | nop == "") |>
+  select(obs)|>
+  sum()
+nb_pieces
+
+
+
