@@ -1,6 +1,6 @@
 #
 # Application Shiny pour les loyers - Version mise à jour
-# Suppression des graphiques araignée et ajout de nouvelles analyses.
+# Ajout de l'option de filtre "1-3P" pour les pièces
 #
 
 # --- 1. Charger les bibliothèques ---
@@ -70,9 +70,14 @@ data <- data %>%
   )
 
 # Créer des listes pour les menus de filtre
-all_zones <- c("Tous" = "Tous", unique(data$Zone))
+zone_choices <- unique(data$Zone)
+zone_choices <- zone_choices[zone_choices != "(Non spécifié)"]
+
 all_types <- c("Tous" = "Tous", unique(data$Type))
-all_pieces <- c("Tous" = "Tous", unique(data$Pieces))
+
+# --- MODIFIÉ : Ajout de l'option "1-3P" ---
+all_pieces <- c("Tous" = "Tous", "1-3P" = "1-3P", unique(data$Pieces))
+
 all_epoque <- c("Tous" = "Tous", unique(data$Epoque_Construction))
 
 
@@ -87,11 +92,14 @@ ui <- fluidPage(
       h4("Filtres de sélection"),
       
       selectInput("zoneFilter", "Périmètre (Zone):",  
-                  choices = all_zones, selected = "Tous"),
+                  choices = zone_choices,
+                  selected = "zone 1",
+                  multiple = TRUE),
       
       selectInput("typeFilter", "Type de logement:",  
                   choices = all_types, selected = "Tous"),
       
+      # Le selectInput utilise maintenant la nouvelle liste "all_pieces"
       selectInput("piecesFilter", "Nombre de pièces:",  
                   choices = all_pieces, selected = "Tous"),
       
@@ -102,6 +110,29 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       tabsetPanel(
+        tabPanel("Définition des Zones",
+                 br(),
+                 fluidRow(
+                   column(10, offset = 1,
+                          h3("Composition des 7 Zones (Source: OLAP)"),
+                          p("Le zonage regroupe des communes/arrondissements de l'agglomération parisienne ayant des niveaux de loyers privés similaires."),
+                          br(),
+                          HTML("<ul>
+                                  <li><strong>Zone 1 :</strong> Les secteurs les plus chers. Comprend les <strong>Paris 6e, 7e, 8e, 16e</strong> et <strong>Neuilly-sur-Seine</strong>.</li>
+                                  <br>
+                                  <li><strong>Zone 2 :</strong> Le reste de Paris intra-muros (sauf 13e, 19e, 20e) et quelques communes très proches et chères. Comprend les <strong>Paris 1er, 2e, 3e, 4e, 5e, 9e, 10e, 11e, 12e, 14e, 15e, 17e, 18e</strong>, ainsi que <strong>Boulogne-Billancourt, Levallois-Perret, Saint-Mandé</strong> et <strong>Vincennes</strong>.</li>
+                                  <br>
+                                  <li><strong>Zone 3 :</strong> Les arrondissements de Paris restants. Comprend les <strong>Paris 13e, 19e</strong> et <strong>20e</strong>.</li>
+                                  <br>
+                                  <li><strong>Zone 4 :</strong> Un grand nombre de communes de la petite couronne et de la grande couronne proche (ex: <strong>Versailles, Asnières-sur-Seine, Clichy, Saint-Maur-des-Fossés, Rueil-Malmaison...</strong>).</li>
+                                  <br>
+                                  <li><strong>Zone 5 :</strong> Des communes de la grande couronne, un peu plus éloignées (ex: <strong>Melun, Champs-sur-Marne, Achères...</strong>).</li>
+                                  <br>
+                                  <li><strong>Zones 6 et 7 :</strong> Elles suivent la même logique et regroupent les communes de la grande couronne les plus éloignées ou celles où les loyers sont les plus modérés.</li>
+                                </ul>")
+                   )
+                 )
+        ),
         tabPanel("Statistiques Résumées",
                  br(),
                  uiOutput("summaryStats")
@@ -110,13 +141,17 @@ ui <- fluidPage(
                  br(),
                  plotOutput("rentPlot", height = "600px")
         ),
-        tabPanel("Loyer / Époque", # NOUVEAU GRAPHIQUE
+        tabPanel("Loyer / Époque",
                  br(),
                  plotOutput("eraPlot", height = "600px")
         ),
-        tabPanel("Total vs m²", # NOUVEAU GRAPHIQUE
+        tabPanel("Loyer / Pièces",
                  br(),
-                 plotOutput("scatterPlot", height = "600px")
+                 plotOutput("loyerPiecesPlot", height = "600px")
+        ),
+        tabPanel("Dispersion (EIQ)",
+                 br(),
+                 plotOutput("dispersionPlot", height = "600px")
         ),
         tabPanel("Données filtrées",
                  br(),
@@ -130,20 +165,31 @@ ui <- fluidPage(
 # --- 4. Définir la logique du Serveur ---
 server <- function(input, output, session) {
   
-  # Expression réactive pour les filtres standards (Graphique 1 et Tableau)
+  # Expression réactive pour les filtres standards
   filteredData <- reactive({
     req(data)  
     df <- data
     
-    if (input$zoneFilter != "Tous") {
-      df <- df %>% filter(Zone == input$zoneFilter)
-    }
+    # Filtre Zone (multi-sélection)
+    req(input$zoneFilter) 
+    df <- df %>% filter(Zone %in% input$zoneFilter)
+    
+    # Filtre Type
     if (input$typeFilter != "Tous") {
       df <- df %>% filter(Type == input$typeFilter)
     }
-    if (input$piecesFilter != "Tous") {
+    
+    # --- MODIFIÉ : Logique de filtre pour Pièces ---
+    if (input$piecesFilter == "1-3P") {
+      # Cas spécial pour 1-3 Pièces
+      df <- df %>% filter(Pieces %in% c("1P", "2P", "3P"))
+    } else if (input$piecesFilter != "Tous") {
+      # Cas standard (si "Tous" n'est pas sélectionné)
       df <- df %>% filter(Pieces == input$piecesFilter)
     }
+    # Si "Tous" est sélectionné, aucun filtre n'est appliqué (comportement correct)
+    
+    # Filtre Epoque
     if (input$epoqueFilter != "Tous") {
       df <- df %>% filter(Epoque_Construction == input$epoqueFilter)
     }
@@ -152,6 +198,7 @@ server <- function(input, output, session) {
   
   # Sortie: Statistiques Résumées
   output$summaryStats <- renderUI({
+    req(filteredData())
     df <- filteredData()
     
     # Calculer les statistiques
@@ -184,7 +231,7 @@ server <- function(input, output, session) {
     # Statistiques globales
     total_obs <- nrow(df)
     complete_obs <- sum(!is.na(df$Loyer_m2_Mediane))
-    completeness <- round(complete_obs / total_obs * 100, 1)
+    completeness <- if (total_obs > 0) round(complete_obs / total_obs * 100, 1) else 0
     
     # Créer l'HTML
     HTML(paste0(
@@ -194,7 +241,6 @@ server <- function(input, output, session) {
       "<p><strong>Nombre total d'observations:</strong> ", total_obs, "</p>",
       "<p><strong>Observations complètes (avec loyer):</strong> ", complete_obs, " (", completeness, "%)</p>",
       "</div>",
-      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Loyer Moyen par Zone (€/m²)</h3>",
       "<table style='width: 100%; border-collapse: collapse; margin-bottom: 30px;'>",
       "<tr style='background: #3498db; color: white;'>",
@@ -214,14 +260,12 @@ server <- function(input, output, session) {
                "</tr>")
       }), collapse = ""),
       "</table>",
-      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;'>Top 5 - Configurations les Plus Chères</h3>",
       "<ol style='background: #fadbd8; padding: 20px; border-radius: 5px; margin-bottom: 20px;'>",
       paste0(apply(top_expensive, 1, function(row) {
         paste0("<li><strong>", row['Config'], "</strong>: ", round(as.numeric(row['Loyer_m2_Mediane']), 2), " €/m²</li>")
       }), collapse = ""),
       "</ol>",
-      
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px;'>Top 5 - Configurations les Moins Chères</h3>",
       "<ol style='background: #d5f4e6; padding: 20px; border-radius: 5px;'>",
       paste0(apply(top_cheap, 1, function(row) {
@@ -234,12 +278,12 @@ server <- function(input, output, session) {
   
   # Sortie: Graphique 1 (PointRange)
   output$rentPlot <- renderPlot({
-    
+    req(filteredData())
     plot_data <- filteredData() %>%
       filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3))
     
     if (nrow(plot_data) == 0) {
-      return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
+      return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher pour cette sélection."), size = 6) + theme_void())
     }
     
     plot_data <- plot_data %>% mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
@@ -259,8 +303,9 @@ server <- function(input, output, session) {
       theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
   })
   
-  # --- NOUVEAU GRAPHIQUE 1 : Loyer par Époque ---
+  # --- Graphique : Loyer par Époque ---
   output$eraPlot <- renderPlot({
+    req(filteredData())
     plot_data <- filteredData() %>%
       filter(Epoque_Construction != "(Non spécifié)", !is.na(Loyer_m2_Mediane))
     
@@ -273,41 +318,92 @@ server <- function(input, output, session) {
     
     ggplot(plot_data, aes(x = Epoque_Construction, y = Loyer_m2_Mediane, fill = Epoque_Construction)) +
       geom_boxplot(alpha = 0.8, show.legend = FALSE) +
+      facet_wrap(~ Zone, scales = "free_y") + 
       labs(title = "Distribution des Loyers au m² par Époque de Construction",
-           subtitle = "Basé sur les filtres actuels",
+           subtitle = "Basé on les filtres actuels, un graphique par zone sélectionnée",
            x = "Époque de Construction",
            y = "Loyer Médian / m² (€)") +
       theme_minimal(base_size = 14) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
   })
   
-  # --- NOUVEAU GRAPHIQUE 2 : Scatter Plot Total vs m² ---
-  output$scatterPlot <- renderPlot({
+  # --- Graphique : Loyer / Pièces (Effet de taille) ---
+  output$loyerPiecesPlot <- renderPlot({
+    req(filteredData())
+    
+    # La logique de filtre pour '1-3P' est déjà appliquée dans filteredData()
+    # Donc nous avons juste besoin de filtrer pour les graphiques
     plot_data <- filteredData() %>%
-      filter(!is.na(Loyer_m2_Mediane), !is.na(Loyer_Total_Mediane)) %>%
-      filter(Pieces != "(Non spécifié)", Zone != "(Non spécifié)")
+      filter(
+        Pieces %in% c("1P", "2P", "3P", "4P+"), 
+        !is.na(Loyer_m2_Mediane),
+        Zone != "(Non spécifié)"
+      )
     
     if (nrow(plot_data) == 0) {
       return(ggplot() + 
                geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + 
-               labs(title = "Veuillez sélectionner des filtres valides.") +
+               labs(title = "Veuillez sélectionner des données valides (ex: 1P, 2P, 1-3P...)") +
                theme_void())
     }
     
-    ggplot(plot_data, aes(x = Loyer_m2_Mediane, y = Loyer_Total_Mediane)) +
-      geom_point(aes(color = Zone, shape = Pieces), alpha = 0.8, size = 3.5) +
-      labs(title = "Loyer Total vs. Loyer au m²",
-           subtitle = "Coloré par Zone, Forme par Nombre de Pièces",
-           x = "Loyer Médian / m² (€)",
-           y = "Loyer Médian Total (€)",
-           color = "Zone",
-           shape = "Pièces") +
+    # Assurer l'ordre correct des pièces sur l'axe X
+    plot_data$Pieces <- factor(plot_data$Pieces, levels = c("1P", "2P", "3P", "4P+"))
+    
+    ggplot(plot_data, aes(x = Pieces, y = Loyer_m2_Mediane, group = Zone, color = Zone)) +
+      geom_line(size = 1.2, alpha = 0.8) +
+      geom_point(size = 3, alpha = 0.8) +
+      labs(title = "Loyer Médian au m² par Nombre de Pièces et Zone",
+           subtitle = "Permet de visualiser l'effet de taille (dégressivité du prix au m²)",
+           x = "Nombre de Pièces",
+           y = "Loyer Médian / m² (€)",
+           color = "Zone") +
       theme_minimal(base_size = 14) +
-      theme(legend.position = "bottom", legend.box = "vertical", plot.title = element_text(face = "bold"))
+      theme(plot.title = element_text(face = "bold"), legend.position = "bottom")
+  })
+  
+  # --- Graphique : Dispersion (EIQ) ---
+  output$dispersionPlot <- renderPlot({
+    req(filteredData())
+    plot_data <- filteredData() %>%
+      filter(
+        !is.na(Loyer_m2_Q1), 
+        !is.na(Loyer_m2_Q3),
+        Zone != "(Non spécifié)"
+      ) %>%
+      mutate(EIQ_m2 = Loyer_m2_Q3 - Loyer_m2_Q1) 
+    
+    plot_summary <- plot_data %>%
+      group_by(Zone) %>%
+      summarise(
+        Loyer_Med_Moyen = mean(Loyer_m2_Mediane, na.rm = TRUE),
+        EIQ_Moyen = mean(EIQ_m2, na.rm = TRUE),
+        .groups = 'drop'
+      ) %>%
+      filter(!is.na(EIQ_Moyen))
+    
+    if (nrow(plot_summary) == 0) {
+      return(ggplot() + 
+               geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + 
+               labs(title = "Veuillez sélectionner des données valides.") +
+               theme_void())
+    }
+    
+    ggplot(plot_summary, aes(x = EIQ_Moyen, y = reorder(Zone, EIQ_Moyen), fill = Loyer_Med_Moyen)) +
+      geom_col() + 
+      labs(title = "Dispersion des Loyers (Écart InterQuartile Moyen)",
+           subtitle = "Une barre plus longue = un marché plus hétérogène (grands écarts de prix)",
+           x = "Écart InterQuartile Moyen au m² (€)",
+           y = "Zone",
+           fill = "Loyer Médian\nMoyen (€/m²)") +
+      scale_fill_gradient(low = "#fee8c8", high = "#e34a33") + 
+      theme_minimal(base_size = 14) +
+      theme(plot.title = element_text(face = "bold"))
   })
   
   # Sortie: Tableau
   output$rentTable <- DT::renderDataTable({
+    req(filteredData())
     
     display_data <- filteredData() %>%
       select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_m2_Q1, Loyer_m2_Q3, Loyer_m2_Moyenne,
