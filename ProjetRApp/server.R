@@ -216,53 +216,53 @@ server <- function(input, output, session) {
   
   # SORTIES: Graphiques (Onglets 4 & 5)
   
-  #GRAPHIQUE 1: Distribution (PointRange)
+  # GRAPHIQUE 1: Distribution (PointRange)
   output$distribPlot <- renderPlot({
     req(filteredData(), input$distribMetric)
     plot_data_base <- filteredData()
     warning_text <- NULL
     
+    # --- 1. Définir les variables dynamiques ---
+    # On définit les noms de colonnes et les libellés en fonction de l'input
     if (input$distribMetric == "m2") {
-      plot_data <- plot_data_base |> 
-        filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3))
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      plot_data <- plot_data |> mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-      
-      if(nrow(plot_data) > 50) {
-        plot_data <- plot_data |> arrange(Loyer_m2_Mediane) |> slice(1:50)
-        warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
-      }
-      
-      ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer_m2_Mediane, color = Zone)) +
-        geom_pointrange(aes(ymin = Loyer_m2_Q1, ymax = Loyer_m2_Q3), size = 0.8) +
-        coord_flip() +  
-        labs(title = "Distribution des Loyers au m² (Médiane, Q1, Q3)", subtitle = warning_text,
-             x = "Catégorie", y = "Loyer / m² (€)", color = "Zone") +
-        theme_minimal(base_size = 14) +
-        theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
-      
+      med_col_sym <- sym("Loyer_m2_Mediane")
+      q1_col_sym  <- sym("Loyer_m2_Q1")
+      q3_col_sym  <- sym("Loyer_m2_Q3")
+      title_lab   <- "Distribution des Loyers au m² (Médiane, Q1, Q3)"
+      y_lab       <- "Loyer / m² (€)"
     } else {
-      plot_data <- plot_data_base |> 
-        filter(!is.na(Loyer_Total_Mediane) & !is.na(Loyer_Total_Q1) & !is.na(Loyer_Total_Q3))
-      
-      if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      
-      plot_data <- plot_data |> mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
-      if(nrow(plot_data) > 50) {
-        plot_data <- plot_data |> arrange(Loyer_Total_Mediane) |> slice(1:50)
-        warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
-      }
-      
-      ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_Total_Mediane), y = Loyer_Total_Mediane, color = Zone)) +
-        geom_pointrange(aes(ymin = Loyer_Total_Q1, ymax = Loyer_Total_Q3), size = 0.8) +
-        coord_flip() +  
-        labs(title = "Distribution des Loyers Totaux (Médiane, Q1, Q3)", subtitle = warning_text,
-             x = "Catégorie", y = "Loyer Total Mensuel (€)", color = "Zone") +
-        theme_minimal(base_size = 14) +
-        theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
+      med_col_sym <- sym("Loyer_Total_Mediane")
+      q1_col_sym  <- sym("Loyer_Total_Q1")
+      q3_col_sym  <- sym("Loyer_Total_Q3")
+      title_lab   <- "Distribution des Loyers Totaux (Médiane, Q1, Q3)"
+      y_lab       <- "Loyer Total Mensuel (€)"
     }
+    
+    # --- 2. Logique de filtrage (commune) ---
+    # On utilise !! (bang-bang) pour que R utilise la *valeur* de nos variables (ex: Loyer_m2_Mediane)
+    plot_data <- plot_data_base |> 
+      filter(!is.na(!!med_col_sym) & !is.na(!!q1_col_sym) & !is.na(!!q3_col_sym))
+    
+    if (nrow(plot_data) == 0) {
+      return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
+    }
+    
+    plot_data <- plot_data |> 
+      mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+    
+    if(nrow(plot_data) > 50) {
+      plot_data <- plot_data |> arrange(!!med_col_sym) |> slice(1:50)
+      warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
+    }
+    
+    # --- 3. Logique de graphique (commune) ---
+    ggplot(plot_data, aes(x = reorder(GroupLabel, !!med_col_sym), y = !!med_col_sym, color = Zone)) +
+      geom_pointrange(aes(ymin = !!q1_col_sym, ymax = !!q3_col_sym), size = 0.8) +
+      coord_flip() +  
+      labs(title = title_lab, subtitle = warning_text,
+           x = "Catégorie", y = y_lab, color = "Zone") +
+      theme_minimal(base_size = 14) +
+      theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
   })
   
   # GRAPHIQUE 2: Dispersion (Barres)
