@@ -1,11 +1,8 @@
 #
 # Fichier: server.R
-# Rôle: Définir la logique du serveur (calculs, graphiques, tables).
-#
+#Définition la logique du serveur (calculs, graphiques, tables).
 
-# --- HELPER (SIMPLIFICATION): Fonction pour créer les listes HTML ---
-# Cette fonction est appelée par topExpensiveUI et topCheapUI
-# pour éviter de dupliquer le code de génération HTML.
+#Fonction pour créer les listes HTML ---
 buildRankHTML <- function(data_frame, unit_label, background_color) {
   if (nrow(data_frame) == 0) {
     return(p("Aucune donnée à afficher."))
