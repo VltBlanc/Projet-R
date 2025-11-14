@@ -43,7 +43,7 @@ fluidPage(
                                    </ul>"),
                           p(strong("Important :"), "Ces loyers sont mesurés", strong("hors charges"), "(eau, chauffage collectif, entretien...). Le budget mensuel réel du locataire sera donc supérieur (Loyer Total + Provisions pour charges)."),
                           
-                          hr(),
+                          br(),
                           
                           h3("Composition des 7 Zones (Source: OLAP)"),
                           p("Le zonage reggroupe des communes/arrondissements de l'agglomération parisienne ayant des niveaux de loyers privés similaires."),
@@ -108,7 +108,7 @@ fluidPage(
                  radioButtons("distribMetric", "Choisir la métrique:",
                               choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                               selected = "m2", inline = TRUE),
-                 hr(),
+                 br(),
                  plotOutput("distribPlot", height = "600px")
         ),
         
@@ -120,7 +120,7 @@ fluidPage(
                  radioButtons("dispersionMetric", "Choisir la métrique:",
                               choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                               selected = "m2", inline = TRUE),
-                 hr(),
+                 br(),
                  plotOutput("dispersionPlot", height = "600px")
         ),
         
@@ -134,9 +134,9 @@ fluidPage(
                           radioButtons("simMetric", "Simuler sur:",
                                        choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                                        selected = "total", inline = TRUE),
-                          hr(),
+                          br(),
                           uiOutput("sliderUI"), # Slider dynamique généré par le serveur
-                          hr(),
+                          br(),
                           p(strong("Mode d'emploi:")),
                           p("1. Choisissez vos filtres (Zone, Type...) dans le panneau de gauche."),
                           p("2. Sélectionnez la simulation (m² ou Total)."),
