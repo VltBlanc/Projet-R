@@ -1,8 +1,3 @@
-#
-# Fichier: global.R
-# Rôle: Charger les bibliothèques, charger et préparer les données.
-# S'exécute une seule fois au démarrage de l'application.
-#
 
 # Charger les bibliothèques 
 library(shiny)
