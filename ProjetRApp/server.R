@@ -369,7 +369,7 @@ server <- function(input, output, session) {
     
     DT::datatable(
       results,
-      options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE),
+      options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,searching = FALSE),
       rownames = FALSE, filter = 'none', class = 'stripe hover'
     ) |> 
       DT::formatRound(columns = cols_to_format, digits = 2) |> 
