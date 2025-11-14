@@ -359,7 +359,7 @@ server <- function(input, output, session) {
       results <- df |> 
         filter(Loyer_Total_Mediane <= slider_val) |> 
         arrange(desc(Loyer_Total_Mediane)) |> 
-        select(Zone, Type, Pieces, Epoque_Construction, Loyer_Total_Mediane, Loyer_m2_Mediane, obs)
+        select(Zone, Type, Pieces,  Loyer_Total_Mediane , obs, Epoque_Construction, Loyer_m2_Mediane)
       cols_to_format <- c('Loyer_Total_Mediane', 'Loyer_m2_Mediane')
     }
     
