@@ -372,25 +372,4 @@ server <- function(input, output, session) {
       DT::formatRound(columns = 'obs', digits = 0)
     
   })
-  
-  
-  # SORTIE: Tableau de données brutes (Onglet 7)
-  output$rentTable <- DT::renderDataTable({
-    req(filteredData())
-    
-    display_data <- filteredData() |> 
-      select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_m2_Q1, Loyer_m2_Q3, Loyer_Total_Mediane, Loyer_Total_Q1, Loyer_Total_Q3, obs)
-    
-    DT::datatable(
-      display_data,
-      options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,
-                     columnDefs = list(list(width = '100px', targets = c(0,1,2,3)))),
-      rownames = FALSE, filter = 'top', class = 'stripe hover'
-    ) |> 
-      DT::formatRound(columns = c(
-        'Loyer_m2_Mediane', 'Loyer_m2_Q1', 'Loyer_m2_Q3',
-        'Loyer_Total_Mediane', 'Loyer_Total_Q1', 'Loyer_Total_Q3'
-      ), digits = 2) |> 
-      DT::formatRound(columns = 'obs', digits = 0)
-  })
 }

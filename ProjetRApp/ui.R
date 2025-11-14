@@ -150,12 +150,6 @@ fluidPage(
                  )
         ),
         
-        # Onglet 7: Données filtrées (Tableau brut)
-        tabPanel("Données filtrées",
-                 br(),
-                 uiOutput("rentTableBanner"), # Ajout de la bannière des contrats
-                 DT::dataTableOutput("rentTable")
-        )
       ) # fin tabsetPanel
     ) # fin mainPanel
   ) # fin sidebarLayout
