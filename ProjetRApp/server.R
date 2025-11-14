@@ -39,23 +39,23 @@ server <- function(input, output, session) {
     
     # Le filtre de zone est requis (pas de "Tous")
     req(input$zoneFilter) 
-    df <- df %>% filter(Zone %in% input$zoneFilter)
+    df <- df |> filter(Zone %in% input$zoneFilter)
     
     # Appliquer le filtre "Type" s'il n'est pas "Tous"
     if (input$typeFilter != "Tous") {
-      df <- df %>% filter(Type == input$typeFilter)
+      df <- df |> filter(Type == input$typeFilter)
     }
     
     # Appliquer le filtre "Pièces" (logique spéciale pour "1-3P")
     if (input$piecesFilter == "1-3P") {
-      df <- df %>% filter(Pieces %in% c("1P", "2P", "3P"))
+      df <- df |> filter(Pieces %in% c("1P", "2P", "3P"))
     } else if (input$piecesFilter != "Tous") {
-      df <- df %>% filter(Pieces == input$piecesFilter)
+      df <- df |> filter(Pieces == input$piecesFilter)
     }
     
     # Appliquer le filtre "Epoque" s'il n'est pas "Tous"
     if (input$epoqueFilter != "Tous") {
-      df <- df %>% filter(Epoque_Construction == input$epoqueFilter)
+      df <- df |> filter(Epoque_Construction == input$epoqueFilter)
     }
     
     # Renvoyer le dataframe filtré
@@ -71,26 +71,26 @@ server <- function(input, output, session) {
     
     # --- 1. Calcul spécial du nombre de contrats ---
     df_for_contracts <- data # data provient de global.R
-    df_for_contracts <- df_for_contracts %>% filter(Zone %in% input$zoneFilter)
+    df_for_contracts <- df_for_contracts |> filter(Zone %in% input$zoneFilter)
     
     if (input$typeFilter == "Tous") {
-      df_for_contracts <- df_for_contracts %>% filter(Type == "ensemble")
+      df_for_contracts <- df_for_contracts |> filter(Type == "ensemble")
     } else {
-      df_for_contracts <- df_for_contracts %>% filter(Type == input$typeFilter)
+      df_for_contracts <- df_for_contracts |> filter(Type == input$typeFilter)
     }
     
     if (input$epoqueFilter == "Tous") {
-      df_for_contracts <- df_for_contracts %>% filter(Epoque_Construction == "(Non spécifié)")
+      df_for_contracts <- df_for_contracts |> filter(Epoque_Construction == "(Non spécifié)")
     } else {
-      df_for_contracts <- df_for_contracts %>% filter(Epoque_Construction == input$epoqueFilter)
+      df_for_contracts <- df_for_contracts |> filter(Epoque_Construction == input$epoqueFilter)
     }
     
     if (input$piecesFilter == "Tous") {
-      df_for_contracts <- df_for_contracts %>% filter(Pieces == "(Non spécifié)")
+      df_for_contracts <- df_for_contracts |> filter(Pieces == "(Non spécifié)")
     } else if (input$piecesFilter == "1-3P") {
-      df_for_contracts <- df_for_contracts %>% filter(Pieces %in% c("1P", "2P", "3P"))
+      df_for_contracts <- df_for_contracts |> filter(Pieces %in% c("1P", "2P", "3P"))
     } else {
-      df_for_contracts <- df_for_contracts %>% filter(Pieces == input$piecesFilter)
+      df_for_contracts <- df_for_contracts |> filter(Pieces == input$piecesFilter)
     }
     total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
     
@@ -101,7 +101,7 @@ server <- function(input, output, session) {
     title_label <- if (input$statsMetric == "m2") paste0("Loyer Moyen par Zone (", unit_label, ")") else paste0("Loyer Total Moyen par Zone (", unit_label, ")")
     
     # --- 3. Calculs statistiques dynamiques ---
-    df_stats <- df_plot %>% filter(!is.na(!!metric_col_sym)) 
+    df_stats <- df_plot |> filter(!is.na(!!metric_col_sym)) 
     
     if (nrow(df_stats) == 0) {
       return(HTML(paste0(
@@ -115,15 +115,15 @@ server <- function(input, output, session) {
       )))
     }
     
-    stats_by_zone <- df_stats %>%
-      group_by(Zone) %>%
+    stats_by_zone <- df_stats |> 
+      group_by(Zone) |> 
       summarise(
         Loyer_Moyen = round(mean(!!metric_col_sym, na.rm = TRUE), 2),
         Loyer_Min = round(min(!!metric_col_sym, na.rm = TRUE), 2),
         Loyer_Max = round(max(!!metric_col_sym, na.rm = TRUE), 2),
         N_Observations = n(),
         .groups = 'drop'
-      ) %>%
+      ) |> 
       arrange(desc(Loyer_Moyen))
     
     total_combinations <- nrow(df_plot)
@@ -171,8 +171,8 @@ server <- function(input, output, session) {
     req(filteredData(), input$rankMetric)
     metric_col_sym <- if (input$rankMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
     
-    df <- filteredData() %>%
-      filter(!is.na(!!metric_col_sym)) %>%
+    df <- filteredData() |> 
+      filter(!is.na(!!metric_col_sym)) |> 
       mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
     
     list(df = df, metric_col_sym = metric_col_sym)
@@ -195,9 +195,9 @@ server <- function(input, output, session) {
     rank_data_list <- rankData()
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    top_expensive <- rank_data_list$df %>%
-      arrange(desc(!!rank_data_list$metric_col_sym)) %>%
-      head(input$rankN) %>%
+    top_expensive <- rank_data_list$df |> 
+      arrange(desc(!!rank_data_list$metric_col_sym)) |> 
+      head(input$rankN) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
     buildRankHTML(top_expensive, unit_label, "#fadbd8") # Fond rouge
@@ -209,9 +209,9 @@ server <- function(input, output, session) {
     rank_data_list <- rankData()
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
-    top_cheap <- rank_data_list$df %>%
-      arrange(!!rank_data_list$metric_col_sym) %>% 
-      head(input$rankN) %>%
+    top_cheap <- rank_data_list$df |> 
+      arrange(!!rank_data_list$metric_col_sym) |> 
+      head(input$rankN) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
     buildRankHTML(top_cheap, unit_label, "#d5f4e6") # Fond vert
@@ -227,15 +227,15 @@ server <- function(input, output, session) {
     warning_text <- NULL
     
     if (input$distribMetric == "m2") {
-      plot_data <- plot_data_base %>%
+      plot_data <- plot_data_base |> 
         filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3))
       
       if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
       
-      plot_data <- plot_data %>% mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+      plot_data <- plot_data |> mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
       
       if(nrow(plot_data) > 50) {
-        plot_data <- plot_data %>% arrange(Loyer_m2_Mediane) %>% slice(1:50)
+        plot_data <- plot_data |> arrange(Loyer_m2_Mediane) |> slice(1:50)
         warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
       }
       
@@ -248,14 +248,14 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(face = "bold"), axis.text.y = element_text(size = 9), legend.position = "bottom")
       
     } else {
-      plot_data <- plot_data_base %>%
+      plot_data <- plot_data_base |> 
         filter(!is.na(Loyer_Total_Mediane) & !is.na(Loyer_Total_Q1) & !is.na(Loyer_Total_Q3))
       
       if (nrow(plot_data) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
       
-      plot_data <- plot_data %>% mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+      plot_data <- plot_data |> mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
       if(nrow(plot_data) > 50) {
-        plot_data <- plot_data %>% arrange(Loyer_Total_Mediane) %>% slice(1:50)
+        plot_data <- plot_data |> arrange(Loyer_Total_Mediane) |> slice(1:50)
         warning_text <- "Note: Affichage des 50 premières lignes (triées). Affinez vos filtres."
       }
       
@@ -274,12 +274,12 @@ server <- function(input, output, session) {
     req(filteredData(), input$dispersionMetric)
     
     if (input$dispersionMetric == "m2") {
-      plot_data <- filteredData() %>%
-        filter(!is.na(Loyer_m2_Q1), !is.na(Loyer_m2_Q3), Zone != "(Non spécifié)") %>%
+      plot_data <- filteredData() |> 
+        filter(!is.na(Loyer_m2_Q1), !is.na(Loyer_m2_Q3), Zone != "(Non spécifié)") |> 
         mutate(EIQ_m2 = Loyer_m2_Q3 - Loyer_m2_Q1) 
       
-      plot_summary <- plot_data %>% group_by(Zone) %>%
-        summarise(Loyer_Med_Moyen = mean(Loyer_m2_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_m2, na.rm = TRUE), .groups = 'drop') %>%
+      plot_summary <- plot_data |> group_by(Zone) |> 
+        summarise(Loyer_Med_Moyen = mean(Loyer_m2_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_m2, na.rm = TRUE), .groups = 'drop') |> 
         filter(!is.na(EIQ_Moyen))
       
       if (nrow(plot_summary) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
@@ -292,12 +292,12 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(face = "bold"))
       
     } else {
-      plot_data <- filteredData() %>%
-        filter(!is.na(Loyer_Total_Q1), !is.na(Loyer_Total_Q3), Zone != "(Non spécifié)") %>%
+      plot_data <- filteredData() |> 
+        filter(!is.na(Loyer_Total_Q1), !is.na(Loyer_Total_Q3), Zone != "(Non spécifié)") |> 
         mutate(EIQ_Total = Loyer_Total_Q3 - Loyer_Total_Q1) 
       
-      plot_summary <- plot_data %>% group_by(Zone) %>%
-        summarise(Loyer_Med_Moyen = mean(Loyer_Total_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_Total, na.rm = TRUE), .groups = 'drop') %>%
+      plot_summary <- plot_data |> group_by(Zone) |> 
+        summarise(Loyer_Med_Moyen = mean(Loyer_Total_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_Total, na.rm = TRUE), .groups = 'drop') |> 
         filter(!is.na(EIQ_Moyen))
       
       if (nrow(plot_summary) == 0) return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
@@ -346,7 +346,6 @@ server <- function(input, output, session) {
                 min = min_val,
                 max = max_val,
                 value = start_val,
-                step = step_val,
                 width = "100%")
   })
   
@@ -358,16 +357,16 @@ server <- function(input, output, session) {
     slider_val <- input$simSlider 
     
     if (input$simMetric == "m2") {
-      results <- df %>%
-        filter(Loyer_m2_Mediane <= slider_val) %>%
-        arrange(desc(Loyer_m2_Mediane)) %>%
+      results <- df |> 
+        filter(Loyer_m2_Mediane <= slider_val) |> 
+        arrange(desc(Loyer_m2_Mediane)) |> 
         select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_Total_Mediane, obs)
       cols_to_format <- c('Loyer_m2_Mediane', 'Loyer_Total_Mediane')
       
     } else {
-      results <- df %>%
-        filter(Loyer_Total_Mediane <= slider_val) %>%
-        arrange(desc(Loyer_Total_Mediane)) %>%
+      results <- df |> 
+        filter(Loyer_Total_Mediane <= slider_val) |> 
+        arrange(desc(Loyer_Total_Mediane)) |> 
         select(Zone, Type, Pieces, Epoque_Construction, Loyer_Total_Mediane, Loyer_m2_Mediane, obs)
       cols_to_format <- c('Loyer_Total_Mediane', 'Loyer_m2_Mediane')
     }
@@ -376,8 +375,8 @@ server <- function(input, output, session) {
       results,
       options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE),
       rownames = FALSE, filter = 'none', class = 'stripe hover'
-    ) %>%
-      DT::formatRound(columns = cols_to_format, digits = 2) %>%
+    ) |> 
+      DT::formatRound(columns = cols_to_format, digits = 2) |> 
       DT::formatRound(columns = 'obs', digits = 0)
     
   })
@@ -387,7 +386,7 @@ server <- function(input, output, session) {
   output$rentTable <- DT::renderDataTable({
     req(filteredData())
     
-    display_data <- filteredData() %>%
+    display_data <- filteredData() |> 
       select(Zone, Type, Pieces, Epoque_Construction, Loyer_m2_Mediane, Loyer_m2_Q1, Loyer_m2_Q3, Loyer_Total_Mediane, Loyer_Total_Q1, Loyer_Total_Q3, obs)
     
     DT::datatable(
@@ -395,11 +394,11 @@ server <- function(input, output, session) {
       options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,
                      columnDefs = list(list(width = '100px', targets = c(0,1,2,3)))),
       rownames = FALSE, filter = 'top', class = 'stripe hover'
-    ) %>%
+    ) |> 
       DT::formatRound(columns = c(
         'Loyer_m2_Mediane', 'Loyer_m2_Q1', 'Loyer_m2_Q3',
         'Loyer_Total_Mediane', 'Loyer_Total_Q1', 'Loyer_Total_Q3'
-      ), digits = 2) %>%
+      ), digits = 2) |> 
       DT::formatRound(columns = 'obs', digits = 0)
   })
 }

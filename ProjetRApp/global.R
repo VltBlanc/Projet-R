@@ -44,7 +44,7 @@ if (!file.exists(file_path)) {
 }
 
 # --- 3. Nettoyer et renommer les colonnes ---
-data <- data %>%
+data <- data |> 
   # Renommer les colonnes pour plus de clarté
   rename(
     Zone = périmètre,
@@ -59,14 +59,14 @@ data <- data %>%
     Loyer_Total_Mediane = Médiane.1,
     Loyer_Total_Q3 = Q3.1,
     Loyer_Total_Moyenne = Moyenne.1
-  ) %>%
+  ) |> 
   # Convertir les colonnes de loyer et d'observations en numérique
   mutate(
     across(starts_with("Loyer_") | "obs", as.numeric)
   )
 
 # Remplacer les NA dans les colonnes de *filtre* (texte)
-data <- data %>%
+data <- data |> 
   mutate(
     Zone = ifelse(is.na(Zone), "(Non spécifié)", Zone),
     Type = ifelse(is.na(Type), "(Non spécifié)", Type),
