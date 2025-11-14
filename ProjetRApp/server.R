@@ -180,24 +180,22 @@ server <- function(input, output, session) {
   
   # Titres dynamiques (Top 10, Top 20...)
   output$rankExpensiveTitle <- renderText({
-    req(input$rankN)
-    paste("Top", input$rankN, "- Configurations les Plus Chères")
+    paste("Top", 10, "- Configurations les Plus Chères")
   })
   
   output$rankCheapTitle <- renderText({
-    req(input$rankN)
-    paste("Top", input$rankN, "- Configurations les Moins Chères")
+    paste("Top", 10, "- Configurations les Moins Chères")
   })
   
   # Sortie pour la liste des "Plus Chers"
   output$topExpensiveUI <- renderUI({
-    req(rankData(), input$rankN)
+    req(rankData(), 10)
     rank_data_list <- rankData()
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
     top_expensive <- rank_data_list$df |> 
       arrange(desc(!!rank_data_list$metric_col_sym)) |> 
-      head(input$rankN) |> 
+      head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
     buildRankHTML(top_expensive, unit_label, "#fadbd8") # Fond rouge
@@ -205,13 +203,13 @@ server <- function(input, output, session) {
   
   # Sortie pour la liste des "Moins Chers"
   output$topCheapUI <- renderUI({
-    req(rankData(), input$rankN)
+    req(rankData(), 10)
     rank_data_list <- rankData()
     unit_label <- if (input$rankMetric == "m2") "€/m²" else "€"
     
     top_cheap <- rank_data_list$df |> 
       arrange(!!rank_data_list$metric_col_sym) |> 
-      head(input$rankN) |> 
+      head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
     buildRankHTML(top_cheap, unit_label, "#d5f4e6") # Fond vert

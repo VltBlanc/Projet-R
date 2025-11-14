@@ -1,50 +1,36 @@
-#
-# Fichier: ui.R
-# Rôle: Définir l'interface utilisateur (UI).
-#
-
-# --- 5. Définir l'Interface Utilisateur (UI) ---
-ui <- fluidPage(
+fluidPage(
   titlePanel("Analyse des Loyers - Paris 2024"),
-  
   # Disposition avec une barre latérale et un panneau principal
   sidebarLayout(
-    
-    # --- Panneau de la barre latérale (Filtres) ---
     sidebarPanel(
-      # ... (sidebarPanel inchangé) ...
       width = 3,
       h4("Filtres de sélection"),
-      
-      # Filtre pour la Zone (obligatoire)
+      # les varaibles all viennent de global
+      # Filtre pour la zone (obligatoire)
       selectInput("zoneFilter", "Périmètre (Zone):",  
-                  choices = zone_choices, # Provient de global.R
+                  choices = zone_choices,
                   selected = "zone 1",
                   multiple = TRUE),
-      
-      # Filtre pour le Type de logement
+      # Filtre pour le type de logement
       selectInput("typeFilter", "Type de logement:",  
-                  choices = all_types, # Provient de global.R
+                  choices = all_types,
                   selected = "Tous"),
-      
-      # Filtre pour le Nombre de pièces
+      # Filtre pour le nombre de pièces
       selectInput("piecesFilter", "Nombre de pièces:",  
-                  choices = all_pieces, # Provient de global.R
+                  choices = all_pieces,
                   selected = "Tous"),
-      
-      # Filtre pour l'Époque de construction
+      # Filtre pour l'époque de construction
       selectInput("epoqueFilter", "Époque de construction:",  
-                  choices = all_epoque, # Provient de global.R
+                  choices = all_epoque,
                   selected = "Tous")
     ),
     
-    # --- Panneau principal (Onglets) ---
+    # Panneau principal 
     mainPanel(
       width = 9,
       # Crée la structure des onglets
       tabsetPanel(
-        
-        # Onglet 1: Définitions (inchangé)
+        # Onglet 1: Définitions
         tabPanel("Définitions",
                  br(),
                  fluidRow(
@@ -52,8 +38,8 @@ ui <- fluidPage(
                           h3("Définition des Loyers"),
                           p("L'application présente deux types de statistiques de loyer, toutes deux issues de l'annexe statistique de l'OLAP :"),
                           HTML("<ul>
-                                     <li><strong>Loyer au m² :</strong> (Colonnes Q1, Médiane, Q3) Représente le loyer mensuel médian **par mètre carré**. C'est un indicateur clé du prix du marché immobilier.</li>
-                                     <li><strong>Loyer Total :</strong> (Colonnes Q1.1, Médiane.1, Q3.1) Représente le loyer mensuel **total** (le loyer 'nu') payé par le locataire.</li>
+                                     <li><strong>Loyer au m² :</strong> (Colonnes Q1, Médiane, Q3) Représente le loyer mensuel médian par mètre carré. C'est un indicateur clé du prix du marché immobilier.</li>
+                                     <li><strong>Loyer Total :</strong> (Colonnes Q1.1, Médiane.1, Q3.1) Représente le loyer mensuel total (le loyer 'nu') payé par le locataire.</li>
                                    </ul>"),
                           p(strong("Important :"), "Ces loyers sont mesurés", strong("hors charges"), "(eau, chauffage collectif, entretien...). Le budget mensuel réel du locataire sera donc supérieur (Loyer Total + Provisions pour charges)."),
                           
@@ -78,36 +64,28 @@ ui <- fluidPage(
                  )
         ),
         
-        # Onglet 2: Statistiques Résumées (inchangé)
+        # Onglet 2: Statistiques Résumées
         tabPanel("Statistiques Résumées",
                  br(),
-                 # Bouton pour choisir la métrique (m² ou Total)
-                 radioButtons("statsMetric", "Choisir la métrique:",
+                 # Bouton pour choisir m² ou Total
+                 radioButtons("statsMetric", "Choisir:",
                               choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                               selected = "m2", inline = TRUE),
-                 hr(),
-                 # L'interface utilisateur est générée dans le serveur (dynamique)
+                 br(),
                  uiOutput("summaryStats")
         ),
         
         # Onglet 3: Classements
         tabPanel("Classements",
                  br(),
-                 # La bannière infoBannerHTML(contractData()) est incluse dans l'output$topExpensiveUI dans server.R
                  fluidRow(
                    column(5,
-                          # Bouton pour choisir la métrique de classement
                           radioButtons("rankMetric", "Classer selon:",
                                        choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
                                        selected = "m2", inline = TRUE)
                    ),
-                   column(4,
-                          # Champ numérique pour choisir le nombre de résultats
-                          numericInput("rankN", "Nombre de résultats à afficher:",
-                                       value = 10, min = 3, max = 100, step = 1, width = "200px")
-                   )
                  ),
-                 hr(),
+                 br(),
                  fluidRow(
                    # Colonne pour les plus chers
                    column(6,
