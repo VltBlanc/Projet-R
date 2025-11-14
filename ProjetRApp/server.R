@@ -1,7 +1,3 @@
-#
-#Fichier: server.R
-#Définition la logique du serveur (calculs, graphiques, tables).
-
 # Fonction pour créer les listes HTML
 buildRankHTML <- function(data_frame, unit_label, background_color) {
   if (nrow(data_frame) == 0) {
