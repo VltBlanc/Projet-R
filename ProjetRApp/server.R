@@ -1,14 +1,14 @@
 #
-# Fichier: server.R
+#Fichier: server.R
 #Définition la logique du serveur (calculs, graphiques, tables).
 
-#Fonction pour créer les listes HTML ---
+# Fonction pour créer les listes HTML
 buildRankHTML <- function(data_frame, unit_label, background_color) {
   if (nrow(data_frame) == 0) {
     return(p("Aucune donnée à afficher."))
   }
   
-  # Construire les items de la liste <li>
+  # Construire les éléments de la liste <li>
   list_items <- apply(data_frame, 1, function(row) {
     paste0("<li><strong>", row['Config'], "</strong>: ", 
            round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
@@ -24,53 +24,51 @@ buildRankHTML <- function(data_frame, unit_label, background_color) {
 
 
 # ==================================================================
-# --- 6. Définir la logique du Serveur ---
+#6. Définir le fonctionnement du Serveur 
 # ==================================================================
 server <- function(input, output, session) {
   
-  # --- RÉACTIF 1: Données Filtrées (LA BASE) ---
-  # Ce bloc 'reactive' est le cœur de l'application.
-  # Il s'exécute à chaque fois qu'un filtre de la barre latérale est modifié.
-  # Il renvoie un dataframe filtré que *tous les autres outputs* peuvent utiliser.
+  # Données Filtrées (LA BASE) 
+
   filteredData <- reactive({
-    # data provient de global.R
-    req(data) # S'assurer que 'data' est chargé
+    # Data provient de global.R
+    req(data) # Vérifie que 'data' est chargé
     df <- data
     
     # Le filtre de zone est requis (pas de "Tous")
     req(input$zoneFilter) 
     df <- df |> filter(Zone %in% input$zoneFilter)
     
-    # Appliquer le filtre "Type" s'il n'est pas "Tous"
+    # Appliquer le filtre "Type" s'il est different de "Tous"
     if (input$typeFilter != "Tous") {
       df <- df |> filter(Type == input$typeFilter)
     }
     
-    # Appliquer le filtre "Pièces" (logique spéciale pour "1-3P")
+    # Appliquer le filtre "Pièces" (pour "1-3P")
     if (input$piecesFilter == "1-3P") {
       df <- df |> filter(Pieces %in% c("1P", "2P", "3P"))
     } else if (input$piecesFilter != "Tous") {
       df <- df |> filter(Pieces == input$piecesFilter)
     }
     
-    # Appliquer le filtre "Epoque" s'il n'est pas "Tous"
+    # Appliquer le filtre "Epoque" s'il est différent de "Tous"
     if (input$epoqueFilter != "Tous") {
       df <- df |> filter(Epoque_Construction == input$epoqueFilter)
     }
     
-    # Renvoyer le dataframe filtré
+    # Renvoi le dataframe filtré
     return(df)
   })
   
-  # --- SORTIE: Statistiques Résumées (Onglet 2) ---
+  #SORTIE: Statistiques Résumées (Onglet 2) 
   output$summaryStats <- renderUI({
     # Dépend des données filtrées et du choix de métrique (m²/total)
     req(filteredData(), input$statsMetric) 
     
     df_plot <- filteredData() # Récupérer les données filtrées
     
-    # --- 1. Calcul spécial du nombre de contrats ---
-    df_for_contracts <- data # data provient de global.R
+    #1. Calcul spécial du nombre de contrats
+    df_for_contracts <- data #data provient de global.R
     df_for_contracts <- df_for_contracts |> filter(Zone %in% input$zoneFilter)
     
     if (input$typeFilter == "Tous") {
@@ -95,12 +93,12 @@ server <- function(input, output, session) {
     total_contracts <- sum(df_for_contracts$obs, na.rm = TRUE)
     
     
-    # --- 2. Définition des variables dynamiques ---
+    #2. Définition des variables dynamiques
     metric_col_sym <- if (input$statsMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
     unit_label <- if (input$statsMetric == "m2") "€/m²" else "€"
     title_label <- if (input$statsMetric == "m2") paste0("Loyer Moyen par Zone (", unit_label, ")") else paste0("Loyer Total Moyen par Zone (", unit_label, ")")
     
-    # --- 3. Calculs statistiques dynamiques ---
+    #3. Calculs statistiques dynamiques
     df_stats <- df_plot |> filter(!is.na(!!metric_col_sym)) 
     
     if (nrow(df_stats) == 0) {
@@ -130,7 +128,7 @@ server <- function(input, output, session) {
     complete_combinations <- nrow(df_stats)
     completeness <- if (total_combinations > 0) round(complete_combinations / total_combinations * 100, 1) else 0
     
-    # --- 4. Génération HTML (simplifiée) ---
+    #4. Génération HTML (simplifiée)
     HTML(paste0(
       "<div style='padding: 20px;'>",
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
@@ -164,9 +162,9 @@ server <- function(input, output, session) {
     ))
   })
   
-  # --- SORTIES: Classements (Onglet 3) ---
+  #SORTIES: Classements (Onglet 3)
   
-  # Réactif 2: Données pour le classement
+  #Réactif 2: Données pour le classement
   rankData <- reactive({
     req(filteredData(), input$rankMetric)
     metric_col_sym <- if (input$rankMetric == "m2") sym("Loyer_m2_Mediane") else sym("Loyer_Total_Mediane")
@@ -178,7 +176,7 @@ server <- function(input, output, session) {
     list(df = df, metric_col_sym = metric_col_sym)
   })
   
-  # Titres dynamiques (Top 10, Top 20...)
+  #Titres dynamiques (Top 10, Top 20...)
   output$rankExpensiveTitle <- renderText({
     paste("Top", 10, "- Configurations les Plus Chères")
   })
@@ -187,7 +185,7 @@ server <- function(input, output, session) {
     paste("Top", 10, "- Configurations les Moins Chères")
   })
   
-  # Sortie pour la liste des "Plus Chers"
+  #Sortie pour la liste des "Plus Chers"
   output$topExpensiveUI <- renderUI({
     req(rankData(), 10)
     rank_data_list <- rankData()
@@ -198,7 +196,7 @@ server <- function(input, output, session) {
       head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    buildRankHTML(top_expensive, unit_label, "#fadbd8") # Fond rouge
+    buildRankHTML(top_expensive, unit_label, "#fadbd8") #Fond rouge
   })
   
   # Sortie pour la liste des "Moins Chers"
@@ -212,13 +210,13 @@ server <- function(input, output, session) {
       head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    buildRankHTML(top_cheap, unit_label, "#d5f4e6") # Fond vert
+    buildRankHTML(top_cheap, unit_label, "#d5f4e6") #Fond vert
   })
   
   
-  # --- SORTIES: Graphiques (Onglets 4 & 5) ---
+  # SORTIES: Graphiques (Onglets 4 & 5)
   
-  # GRAPHIQUE 1: Distribution (PointRange)
+  #GRAPHIQUE 1: Distribution (PointRange)
   output$distribPlot <- renderPlot({
     req(filteredData(), input$distribMetric)
     plot_data_base <- filteredData()
@@ -310,9 +308,9 @@ server <- function(input, output, session) {
   })
   
   
-  # --- SORTIES: Simulateur (Onglet 6) ---
+  # SORTIES: Simulateur (Onglet 6)
   
-  # 1. Générer le Slider dynamique
+  #1. Générer le Slider dynamique
   output$sliderUI <- renderUI({
     req(filteredData(), input$simMetric)
     df <- filteredData()
@@ -380,7 +378,7 @@ server <- function(input, output, session) {
   })
   
   
-  # --- SORTIE: Tableau de données brutes (Onglet 7) ---
+  # SORTIE: Tableau de données brutes (Onglet 7)
   output$rentTable <- DT::renderDataTable({
     req(filteredData())
     
