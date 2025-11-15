@@ -63,7 +63,7 @@ data <- data |>
 # Data qui  seront disponibles dans ui.R et server.R
 zone_choices <- unique(data$Zone)
 zone_choices <- zone_choices[zone_choices != "(Non spécifié)"] # Retirer le "Non spécifié" des choix
-
+all_zone <- c("Tous" = "Tous", unique(data$Zone))
 all_types <- c("Tous" = "Tous", unique(data$Type))
 all_pieces <- c("Tous" = "Tous", "1-3P" = "1-3P", unique(data$Pieces))
 all_epoque <- c("Tous" = "Tous", unique(data$Epoque_Construction))

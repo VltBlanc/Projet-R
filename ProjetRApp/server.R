@@ -7,8 +7,7 @@ buildRankHTML <- function(data_frame, unit_label, background_color) {
   # Construire les éléments de la liste <li>
   list_items <- apply(data_frame, 1, function(row) {
     paste0("<li><strong>", row['Config'], "</strong>: ", 
-           round(as.numeric(row['Value']), 2), " ", unit_label, 
-           " (obs: ", row['obs'], ")</li>") # Ajout de (obs: ...)
+           round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
   })
   
   # Retourner le HTML complet <ol>...</ol>
@@ -303,6 +302,50 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(face = "bold"))
     }
   })
+    # ==========================================================
+    # NOUVELLE FENETRE 1: Loyers Moyens par Zone
+    # ==========================================================
+    output$avgZonePlot <- renderPlot({
+      req(filteredData(), input$avgMetric)
+      
+      # 1. Définir les variables
+      if (input$avgMetric == "m2") {
+        metric_col_sym <- sym("Loyer_m2_Moyenne")
+        title_lab <- "Loyer Moyen au m² (pondéré)"
+        x_lab <- "Loyer Moyen / m² (€)"
+      } else {
+        metric_col_sym <- sym("Loyer_Total_Moyenne")
+        title_lab <- "Loyer Moyen Total (pondéré)"
+        x_lab <- "Loyer Moyen Total (€)"
+      }
+      
+      # 2. Préparer les données
+      plot_data <- filteredData() |> 
+        filter(!is.na(!!metric_col_sym) & !is.na(obs))
+      
+      if (nrow(plot_data) == 0) {
+        return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
+      }
+      
+      # Agréger par Zone en utilisant une moyenne pondérée
+      plot_summary <- plot_data |> 
+        group_by(Zone) |> 
+        summarise(Loyer_Agg = weighted.mean(!!metric_col_sym, w = obs, na.rm = TRUE),
+                  .groups = 'drop') |> 
+        filter(!is.na(Loyer_Agg))
+      
+      # 3. Graphique
+      ggplot(plot_summary, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg))) +
+        geom_col(aes(fill = Zone), alpha = 0.8) +
+        geom_text(aes(label = round(Loyer_Agg, 1)), hjust = -0.2, size = 4) +
+        labs(title = title_lab,
+             subtitle = "Moyenne des catégories filtrées, pondérée par le nb. d'observations",
+             x = x_lab, y = "Zone") +
+        scale_fill_viridis_d() + 
+        theme_minimal(base_size = 14) +
+        theme(plot.title = element_text(face = "bold"),
+              legend.position = "none")
+    })
   
   
   # SORTIES: Simulateur (Onglet 6)

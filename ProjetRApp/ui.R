@@ -9,7 +9,7 @@ fluidPage(
       # Filtre pour la zone (obligatoire)
       selectInput("zoneFilter", "Périmètre (Zone):",  
                   choices = zone_choices,
-                  selected = "zone 1",
+                  selected = all_zone,
                   multiple = TRUE),
       # Filtre pour le type de logement
       selectInput("typeFilter", "Type de logement:",  
@@ -73,6 +73,15 @@ fluidPage(
                               selected = "m2", inline = TRUE),
                  br(),
                  uiOutput("summaryStats")
+        ),
+        tabPanel("Loyers Moyens (Moyenne)",
+                 br(),
+                 radioButtons("avgMetric", "Choisir la métrique:",
+                              choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
+                              selected = "m2", inline = TRUE),
+                 br(),
+                 p("Ce graphique montre la moyenne (pondérée par le nombre d'observations) des loyers moyens pour les catégories sélectionnées."),
+                 plotOutput("avgZonePlot", height = "600px")
         ),
         
         # Onglet 3: Classements
