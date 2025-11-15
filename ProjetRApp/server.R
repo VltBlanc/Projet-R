@@ -172,7 +172,6 @@ server <- function(input, output, session) {
     list(df = df, metric_col_sym = metric_col_sym)
   })
   
-  #Titres dynamiques (Top 10, Top 20...)
   output$rankExpensiveTitle <- renderText({
     paste("Top", 10, "- Configurations les Plus Chères")
   })
@@ -192,7 +191,7 @@ server <- function(input, output, session) {
       head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    buildRankHTML(top_expensive, unit_label, "#fadbd8") #Fond rouge
+    buildRankHTML(top_expensive, unit_label, "#fadbd8")
   })
   
   # Sortie pour la liste des "Moins Chers"
@@ -206,7 +205,7 @@ server <- function(input, output, session) {
       head(10) |> 
       mutate(Value = !!rank_data_list$metric_col_sym) 
     
-    buildRankHTML(top_cheap, unit_label, "#d5f4e6") #Fond vert
+    buildRankHTML(top_cheap, unit_label, "#d5f4e6")
   })
   
   
@@ -343,6 +342,7 @@ server <- function(input, output, session) {
              x = x_lab, y = "Zone") +
         scale_fill_viridis_d() + 
         theme_minimal(base_size = 14) +
+        # MODIFIÉ: Supprime la légende de couleur car les zones sont sur l'axe Y
         theme(plot.title = element_text(face = "bold"),
               legend.position = "none")
     })
