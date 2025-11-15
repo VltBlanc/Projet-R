@@ -74,7 +74,7 @@ fluidPage(
                  br(),
                  uiOutput("summaryStats")
         ),
-        tabPanel("Loyers Moyens (Moyenne)",
+        tabPanel("Loyers Moyens",
                  br(),
                  radioButtons("avgMetric", "Choisir la métrique:",
                               choices = c("Loyer / m²" = "m2", "Loyer Total" = "total"),
