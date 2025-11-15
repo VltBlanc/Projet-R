@@ -7,7 +7,8 @@ buildRankHTML <- function(data_frame, unit_label, background_color) {
   # Construire les éléments de la liste <li>
   list_items <- apply(data_frame, 1, function(row) {
     paste0("<li><strong>", row['Config'], "</strong>: ", 
-           round(as.numeric(row['Value']), 2), " ", unit_label, "</li>")
+           round(as.numeric(row['Value']), 2), " ", unit_label, 
+           " (obs: ", row['obs'], ")</li>") # Ajout de (obs: ...)
   })
   
   # Retourner le HTML complet <ol>...</ol>
