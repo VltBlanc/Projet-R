@@ -141,7 +141,7 @@ fluidPage(
                           p("1. Choisissez vos filtres (Zone, Type...) dans le panneau de gauche."),
                           p("2. Sélectionnez la simulation (m² ou Total)."),
                           p("3. Déplacez le slider pour définir votre loyer médian maximum."),
-                          p("4. Le tableau à droite affiche les combinaisons correspondantes.")
+                          p("4. Le tableau à droite affiche les combinaisons correspondantes. 'obs' correspond au nombre d'appartements resencé avec ces critères")
                    ),
                    column(8,
                           h4("Logements correspondants (Loyer médian <= votre choix)"),
