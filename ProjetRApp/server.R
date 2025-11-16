@@ -416,4 +416,66 @@ server <- function(input, output, session) {
       DT::formatRound(columns = 'obs', digits = 0)
     
   })
+  
+  # SORTIE: Graphique nombre de pièce par zone d'habitation
+  output$piecesPlot <- renderPlot({
+    
+    # 1. Récupérer les données filtrées
+    df <- filteredData()
+    
+    # 2. Vérifier si les données sont vides ou nulles
+    if (is.null(df) || nrow(df) == 0) {
+      return(ggplot() + 
+               geom_text(aes(x = 0.5, y = 0.5, label = "Aucune donnée disponible"), size = 6) +
+               theme_void())
+    }
+    
+    # 3. Vériifier si la colonne 'Pieces' existe-t-elle ?
+    if (!"Pieces" %in% names(df)) {
+      return(ggplot() + 
+               geom_text(aes(x = 0.5, y = 0.5, 
+                             label = "Erreur : Colonne 'Pieces' non trouvée.\n(Vérifiez le code de filteredData())"), 
+                         size = 5, color = "red") +
+               theme_void())
+    }
+    
+    # 4. Traitement des données (comportement fixe)
+    # On INCLUT les 'Pieces' vides en les renommant "Non spécifié"
+    df_processed <- df |>
+      dplyr::mutate(
+        Pieces = ifelse(is.na(Pieces) | Pieces == "", "Non spécifié", Pieces)
+      )
+    
+    # 5. Vérifier s'il reste des données APRES ce traitement
+    if (nrow(df_processed) == 0) {
+      return(ggplot() + 
+               geom_text(aes(x = 0.5, y = 0.5, label = "Aucune donnée après filtrage"), size = 6) +
+               theme_void())
+    }
+    
+    # 6. Regroupement par Zone et nombre de pièces
+    plot_df <- df_processed |>
+      group_by(Zone, Pieces) |>
+      summarise(N = sum(obs, na.rm = TRUE), .groups = "drop")
+    
+    # 7. Graphique
+    ggplot(plot_df, aes(x = Zone, y = N, fill = Pieces)) +
+      geom_col(position = "fill") +
+      scale_y_continuous(labels = scales::percent_format()) +
+      labs(
+        title = "Répartition du nombre de pièces par zone",
+        x = "Zone",
+        y = "Proportion de logements",
+        fill = "Nombre de pièces"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      )
+  })
+
+  
+  
+  
 }

@@ -159,6 +159,15 @@ fluidPage(
                  )
         ),
         
+        tabPanel(
+          "Pièces par zone",
+          mainPanel(
+            plotOutput("piecesPlot", height = "600px"),
+            width = 12 
+          )
+        )
+        
+      
       ) # fin tabsetPanel
     ) # fin mainPanel
   ) # fin sidebarLayout
