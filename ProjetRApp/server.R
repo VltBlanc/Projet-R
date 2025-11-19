@@ -129,7 +129,6 @@ server <- function(input, output, session) {
     complete_combinations <- nrow(df_stats)
     completeness <- if (total_combinations > 0) round(complete_combinations / total_combinations * 100, 1) else 0
     
-    #4. Génération HTML (simplifiée)
     HTML(paste0(
       "<div style='padding: 20px;'>",
       "<h3 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Statistiques Générales</h3>",
