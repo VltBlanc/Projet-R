@@ -1,7 +1,14 @@
-J'ai (Hugo) séparé le fichier de l'app en 3 pour alléger le tout, une partie logique du serveur et une autre ui
+Voici le Projet final de R
+Le projet est composé de :
+  le raport en Markdown
+  l'app dans un dossier à part
+  la base de donnée trouvée sur le site de l'observatoir des loyes de l'aglomération parisienne (OLAP) https://www.observatoire-des-loyers.fr/
 
 
 
+Informations pour la base de données : 
+
+Le zonage reggroupe des communes/arrondissements de l'agglomération parisienne ayant des niveaux de loyers privés similaires.
 
 Zone 1 : Les secteurs les plus chers. Comprend les Paris 6e, 7e, 8e, 16e et Neuilly-sur-Seine.
 
