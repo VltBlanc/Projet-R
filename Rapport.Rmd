@@ -31,7 +31,7 @@ raw <- read.csv(file_path, sep = ";", header = TRUE, stringsAsFactors = FALSE, f
 Notre jeu de donnée porte sur les loyers de Paris.
 On a décidé de renommer les variables du jeu de donnée pour qu'elle soit plus facile à comprendre.
 ```{r ,echo=FALSE}
-# Renommage des variables et conversion
+# Renommage des variables
 library(rlang)
 data <- raw |>
   rename(
@@ -85,7 +85,7 @@ Les objectifs principaux sont :
 
 # Graphiques
 
-## Loyers moyens pondérés par zone
+## Loyers moyens par zone
 
 ```{r ,echo=FALSE}
 plot_data_avg <- data |> filter(!is.na(Loyer_m2_Moyenne) & !is.na(obs))
@@ -102,29 +102,34 @@ p3 <- ggplot(plot_summary_avg, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg)))
 
 print(p3)
 ```
+
 On remarque qu'en moyenne plus on est proche du centre plus les loyers sont élevés et inversement. On remarque également qu'il n'y a pas de maisons dans les zones 1,2,3 et 7 (d'après notre jeu de donnée bien sûr).
 
-## Classements (Top 10 configurations — plus chères / moins chères)
+## Classements
 
 ```{r ,echo=FALSE}
-# Construction de la config
 cfg <- data |> mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
 
-# Top 10 plus chères (m2 médiane)
+# Top 10 plus chères
 top10_exp <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(desc(Loyer_m2_Mediane)) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
 
-# Top 10 moins chères (m2 médiane)
+# Top 10 moins chères
 top10_cheap <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(Loyer_m2_Mediane) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
 
+```
+#### Les 10 plus chères
+```{r ,echo=FALSE}
 kable(top10_exp)
-
+```
+#### Les 10 moins chères
+```{r ,echo=FALSE}
 kable(top10_cheap)
 ```
 
 
 On remarque qu'en plus de la zone, le nombre de pièce influe sur le prix du mètre carré : les studios ont tendance à avoir un prix au mètre carré plus élevé que que les logements avec plus de 4 pièces.
 
-## Distribution (Médiane avec Q1 et Q3) — point-range
+## Distribution (Médiane avec Q1 et Q3)
 
 ```{r ,echo=FALSE}
 plot_data <- data |>
@@ -163,7 +168,9 @@ p2 <- ggplot(plot_summary, aes(x = EIQ_Moyen, y = reorder(Zone, EIQ_Moyen), fill
 print(p2)
 ```
 
-## Répartition des pièces par zone (proportions)
+On remarque que les zones proches du centre ont une dispersion des loyers plus élevée.
+
+## Répartition des pièces par zone
 
 ```{r ,echo=FALSE}
 plot_df_pieces <- data |>
@@ -181,14 +188,13 @@ p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
 
 print(p4)
 ```
+
 On remarque que dans la plupart des zones (si on ignore les Na) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
 
 
-# Conclusions potentielles et limites
+# Conclusions
 
-* **Tendances observées** : On s'attend à retrouver des loyers beaucoup plus élevés dans la Zone 1 et 2 (Paris centre et communes très proches) et des loyers décroissants vers les zones plus éloignées. Les graphiques (médiane et moyenne pondérée) permettent de visualiser cet écart.
-
-* **Dispersion** : Les zones centrales montrent souvent une dispersion (EIQ) élevée — traduit par une hétérogénéité du parc (mix entre logements très chers et logements moins chers même dans une même zone).
+* **Tendances observées** : On s'attend à retrouver des loyers beaucoup plus élevés dans la Zone 1 et 2 (Paris centre et communes très proches) et des loyers décroissants vers les zones plus éloignées. Les graphiques (médiane et moyenne pondérée) permettent de visualiser cet écart. Les zones proches du centre montrent souvent une dispersion (EIQ) élevée c'est à dire qui il y a un mix entre logements très chers et logements moins chers même dans ces zones. La proportion de type de logement les plus présent sont les 2 pièces dans la plupart des zones. Enfin les studios ont un prix du mètres carré plus élevé que les 4 pièces et plus? 
 
 * **Limites** :
 
