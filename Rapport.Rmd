@@ -103,31 +103,38 @@ p3 <- ggplot(plot_summary_avg, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg)))
 print(p3)
 ```
 
-On remarque qu'en moyenne plus on est proche du centre plus les loyers sont élevés et inversement. On remarque également qu'il n'y a pas de maisons dans les zones 1,2,3 et 7 (d'après notre jeu de donnée bien sûr).
+On remarque qu'en moyenne plus on est proche du centre plus les loyers sont élevés et inversement.
 
 ## Classements
 
 ```{r ,echo=FALSE}
 cfg <- data |> mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
 
-# Top 10 plus chères
-top10_exp <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(desc(Loyer_m2_Mediane)) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
+# Top 10 des configurations (zone/type/nb de pièces/date) les plus chères
+top10_chere <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |>
+  arrange(desc(Loyer_m2_Mediane)) |> 
+  head(10) |> 
+  select(Config, Loyer_m2_Mediane, obs)
 
-# Top 10 moins chères
-top10_cheap <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(Loyer_m2_Mediane) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
+# Top 10 des configurations (zone/type/nb de pièces/date) les moins chères
+top10_moins_chere <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |>
+  arrange(Loyer_m2_Mediane) |> 
+  head(10) |> 
+  select(Config, Loyer_m2_Mediane, obs)
 
 ```
-#### Les 10 plus chères
+#### Top 10 des configurations (zone/type/nb de pièces/date) les plus chères
 ```{r ,echo=FALSE}
-kable(top10_exp)
+kable(top10_chere)
 ```
-#### Les 10 moins chères
+#### Top 10 des configurations (zone/type/nb de pièces/date) les moins chères
 ```{r ,echo=FALSE}
-kable(top10_cheap)
+kable(top10_moins_chere)
 ```
 
 
 On remarque qu'en plus de la zone, le nombre de pièce influe sur le prix du mètre carré : les studios ont tendance à avoir un prix au mètre carré plus élevé que que les logements avec plus de 4 pièces.
+Ce genre de classement est plus intéressant avec des filtres plus sélectifs.
 
 ## Distribution (Médiane avec Q1 et Q3)
 
@@ -136,7 +143,9 @@ plot_data <- data |>
   filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3)) |>
   mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
 
-if(nrow(plot_data) > 50) plot_data <- plot_data |> arrange(Loyer_m2_Mediane) |> slice(1:50)
+if(nrow(plot_data) > 50) plot_data <- plot_data |> 
+  arrange(Loyer_m2_Mediane) |> 
+  slice(1:50)
 
 p1 <- ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer_m2_Mediane, color = Zone)) +
   geom_pointrange(aes(ymin = Loyer_m2_Q1, ymax = Loyer_m2_Q3), size = 0.8) +
@@ -146,6 +155,7 @@ p1 <- ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer
 
 print(p1)
 ```
+Seules les zones 5 à 7 ont été conservé pour des questions de lisibilité, plus une catégorie est basse sur l'axe des ordonées plus son loyer au m² médian est faible
 
 ## Dispersion — Écart interquartile moyen par zone
 
@@ -167,7 +177,7 @@ p2 <- ggplot(plot_summary, aes(x = EIQ_Moyen, y = reorder(Zone, EIQ_Moyen), fill
 
 print(p2)
 ```
-
+Graphique représentant la dispersion moyenne des loyers par zone
 On remarque que les zones proches du centre ont une dispersion des loyers plus élevée.
 
 ## Répartition des pièces par zone
@@ -178,7 +188,8 @@ plot_df_pieces <- data |>
   summarise(N = sum(obs, na.rm = TRUE), .groups = 'drop')
 
 # Filtrer pour garder catégories présentes
-plot_df_pieces <- plot_df_pieces |> filter(!is.na(Zone) & !is.na(Pieces))
+plot_df_pieces <- plot_df_pieces |> 
+  filter(!is.na(Zone) & !is.na(Pieces))
 
 p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
   geom_col(position = "fill") +
@@ -189,12 +200,37 @@ p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
 print(p4)
 ```
 
-On remarque que dans la plupart des zones (si on ignore les Na) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
+On remarque que dans la plupart des zones (si on ignore les Non spécifié) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
+Le graphique sans les données non renseigné donne ceci :
+```{r, echo=FALSE}
+plot_df_pieces <- data |>
+  # Filtrer les données manquantes (NA) ou explicitement "Non renseigné"
+  filter(
+    Zone != "(Non spécifié)",
+    Pieces != "(Non spécifié)"
+  ) |>
+  group_by(Zone, Pieces) |>
+  summarise(N = sum(obs, na.rm = TRUE), .groups = 'drop')
+
+p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Répartition du nombre de pièces par zone", 
+    x = "Zone", 
+    y = "Proportion de logements", 
+    fill = "Nombre de pièces"
+  ) +
+  theme_minimal(base_size = 12) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p4)
+```
 
 
 # Conclusions
 
-* **Tendances observées** : On s'attend à retrouver des loyers beaucoup plus élevés dans la Zone 1 et 2 (Paris centre et communes très proches) et des loyers décroissants vers les zones plus éloignées. Les graphiques (médiane et moyenne pondérée) permettent de visualiser cet écart. Les zones proches du centre montrent souvent une dispersion (EIQ) élevée c'est à dire qui il y a un mix entre logements très chers et logements moins chers même dans ces zones. La proportion de type de logement les plus présent sont les 2 pièces dans la plupart des zones. Enfin les studios ont un prix du mètres carré plus élevé que les 4 pièces et plus? 
+* **Tendances observées** : On s'attend à retrouver des loyers beaucoup plus élevés dans la Zone 1 et 2 (Paris centre et communes très proches) et des loyers décroissants vers les zones plus éloignées. Les graphiques (médiane et moyenne pondérée) permettent de visualiser cet écart. Les zones proches du centre montrent souvent une dispersion (EIQ) élevée c'est à dire qui il y a un mix entre logements très chers et logements moins chers même dans ces zones. La proportion de type de logement les plus présent sont les 2 pièces dans la plupart des zones. Enfin les studios ont un prix du mètres carré plus élevé que les 4 pièces et plus, ce qui doit être due aux nombreuses cellules vide de ces catégories dans le dataset
 
 * **Limites** :
 
