@@ -1,0 +1,199 @@
+---
+title: "Rapport des loyer à Paris"
+author: "Luca Figlie, Hugo Saulig, Valentin Blanc, Torset Mael"
+date: "2025-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(readr)
+library(knitr)
+library(DT)
+```
+
+# Introduction
+
+Ce rapport accompagne l'application Shiny fournie. Il décrit le jeu de données, les démarches statistiques effectuées et présente les graphiques importants de notre application selon la zone, le type de logement, le nombre de pièces et l'époque de construction. On propose enfin des conclusions potentielles et des limites.
+
+
+```{r load-data, echo=FALSE}
+file_path <- "Paris2024-annexe-statistique-diffusion.csv"
+
+raw <- read.csv(file_path, sep = ";", header = TRUE, stringsAsFactors = FALSE, fileEncoding = "latin1", check.names = TRUE)
+
+```
+
+# Jeu de donnée
+
+Notre jeu de donnée porte sur les loyers de Paris.
+On a décidé de renommer les variables du jeu de donnée pour qu'elle soit plus facile à comprendre.
+```{r ,echo=FALSE}
+# Renommage des variables et conversion
+library(rlang)
+data <- raw |>
+  rename(
+    Zone = périmètre,
+    Type = type,
+    Pieces = nop,
+    Epoque_Construction = epco,
+    Loyer_m2_Q1 = Q1,
+    Loyer_m2_Mediane = Médiane,
+    Loyer_m2_Q3 = Q3,
+    Loyer_m2_Moyenne = Moyenne,
+    Loyer_Total_Q1 = Q1.1,
+    Loyer_Total_Mediane = Médiane.1,
+    Loyer_Total_Q3 = Q3.1,
+    Loyer_Total_Moyenne = Moyenne.1
+  ) |>
+  mutate(across(starts_with("Loyer_") | dplyr::all_of("obs"), ~ as.numeric(.)))
+
+# Remplacer les chaînes vides par NA
+data[data == ""] <- NA
+
+data <- data |>
+  mutate(
+    Zone = ifelse(is.na(Zone), "(Non spécifié)", Zone),
+    Type = ifelse(is.na(Type), "(Non spécifié)", Type),
+    Pieces = ifelse(is.na(Pieces), "(Non spécifié)", Pieces),
+    Epoque_Construction = ifelse(is.na(Epoque_Construction), "(Non spécifié)", Epoque_Construction)
+  )
+```
+### Explication du jeu de donnée :
+
+* Zone : indique le périmètre géographique dans lequel se situe le logement(plus de précision dans l'onglet définition de l'application).
+* Type : décrit le type de logement (appartement, maison, logement collectif, etc.).
+* Pieces : donne le nombre de pièces principales du logement.
+* Epoque_Construction : renseigne la période de construction du bâtiment.
+* Loyer_m2_Q1, Loyer_m2_Mediane, Loyer_m2_Q3, Loyer_m2_Moyenne : indique respectivement le premier quartile, la médiane, le troisième quartille et la moyenne du loyer au m².
+* Loyer_Total_Q1, Loyer_Total_Mediane, Loyer_Total_Q3, Loyer_Total_Moyenne : indique respectivement le premier quartile, la médiane, le troisième quartille et la moyenne du loyer total.
+* obs : nombre d’observations ayant servi à calculer les statistiques de la ligne.
+
+# Démarches statistiques
+
+Les objectifs principaux sont :
+
+* Fournir des statistiques par zone, par nombre de pièce, par type de logement et par époque de construction.
+* Montrer la différence de loyer selon les zones.
+* Produire des classements (top 10 plus chères / moins chères).
+* Visualiser la distribution des loyers (médiane avec premier et troisième quartille).
+* Mesurer la dispersion des loyers via l'écart interquartile.
+* Montrer les logements selon notre budget.
+* Montrer le nombre de pièce par zone.
+
+# Graphiques
+
+## Loyers moyens pondérés par zone
+
+```{r ,echo=FALSE}
+plot_data_avg <- data |> filter(!is.na(Loyer_m2_Moyenne) & !is.na(obs))
+plot_summary_avg <- plot_data_avg |>
+  group_by(Zone) |>
+  summarise(Loyer_Agg = weighted.mean(Loyer_m2_Moyenne, w = obs, na.rm = TRUE), .groups = 'drop') |>
+  filter(!is.na(Loyer_Agg))
+
+p3 <- ggplot(plot_summary_avg, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg))) +
+  geom_col(aes(fill = Zone), alpha = 0.8) +
+  geom_text(aes(label = round(Loyer_Agg, 1)), hjust = -0.1) +
+  labs(title = "Loyer Moyen au m² (pondéré)", x = "€/m²", y = "Zone") +
+  scale_fill_viridis_d() + theme_minimal(base_size = 12) + theme(legend.position = "none")
+
+print(p3)
+```
+On remarque qu'en moyenne plus on est proche du centre plus les loyers sont élevés et inversement. On remarque également qu'il n'y a pas de maisons dans les zones 1,2,3 et 7 (d'après notre jeu de donnée bien sûr).
+
+## Classements (Top 10 configurations — plus chères / moins chères)
+
+```{r ,echo=FALSE}
+# Construction de la config
+cfg <- data |> mutate(Config = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+
+# Top 10 plus chères (m2 médiane)
+top10_exp <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(desc(Loyer_m2_Mediane)) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
+
+# Top 10 moins chères (m2 médiane)
+top10_cheap <- cfg |> filter(!is.na(Loyer_m2_Mediane)) |> arrange(Loyer_m2_Mediane) |> head(10) |> select(Config, Loyer_m2_Mediane, obs)
+
+kable(top10_exp)
+
+kable(top10_cheap)
+```
+
+
+On remarque qu'en plus de la zone, le nombre de pièce influe sur le prix du mètre carré : les studios ont tendance à avoir un prix au mètre carré plus élevé que que les logements avec plus de 4 pièces.
+
+## Distribution (Médiane avec Q1 et Q3) — point-range
+
+```{r ,echo=FALSE}
+plot_data <- data |>
+  filter(!is.na(Loyer_m2_Mediane) & !is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3)) |>
+  mutate(GroupLabel = paste(Zone, Type, Pieces, Epoque_Construction, sep = " / "))
+
+if(nrow(plot_data) > 50) plot_data <- plot_data |> arrange(Loyer_m2_Mediane) |> slice(1:50)
+
+p1 <- ggplot(plot_data, aes(x = reorder(GroupLabel, Loyer_m2_Mediane), y = Loyer_m2_Mediane, color = Zone)) +
+  geom_pointrange(aes(ymin = Loyer_m2_Q1, ymax = Loyer_m2_Q3), size = 0.8) +
+  coord_flip() +
+  labs(title = "Distribution des Loyers au m² (Médiane, Q1, Q3)", x = "Catégorie", y = "€/m²", color = "Zone") +
+  theme_minimal(base_size = 12) + theme(axis.text.y = element_text(size = 8), legend.position = "bottom")
+
+print(p1)
+```
+
+## Dispersion — Écart interquartile moyen par zone
+
+```{r ,echo=FALSE}
+plot_data_eiq <- data |>
+  filter(!is.na(Loyer_m2_Q1) & !is.na(Loyer_m2_Q3) & Zone != "(Non spécifié)") |>
+  mutate(EIQ_m2 = Loyer_m2_Q3 - Loyer_m2_Q1)
+
+plot_summary <- plot_data_eiq |>
+  group_by(Zone) |>
+  summarise(Loyer_Med_Moyen = mean(Loyer_m2_Mediane, na.rm = TRUE), EIQ_Moyen = mean(EIQ_m2, na.rm = TRUE), .groups = 'drop') |>
+  filter(!is.na(EIQ_Moyen))
+
+p2 <- ggplot(plot_summary, aes(x = EIQ_Moyen, y = reorder(Zone, EIQ_Moyen), fill = Loyer_Med_Moyen)) +
+  geom_col() +
+  labs(title = "Dispersion des Loyers (Écart InterQuartile au m²)", x = "EIQ moyen (€/m²)", y = "Zone", fill = "Loyer médian moyen (€/m²)") +
+  scale_fill_gradient(low = "#fee8c8", high = "#e34a33") +
+  theme_minimal(base_size = 12)
+
+print(p2)
+```
+
+## Répartition des pièces par zone (proportions)
+
+```{r ,echo=FALSE}
+plot_df_pieces <- data |>
+  group_by(Zone, Pieces) |>
+  summarise(N = sum(obs, na.rm = TRUE), .groups = 'drop')
+
+# Filtrer pour garder catégories présentes
+plot_df_pieces <- plot_df_pieces |> filter(!is.na(Zone) & !is.na(Pieces))
+
+p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Répartition du nombre de pièces par zone", x = "Zone", y = "Proportion de logements", fill = "Nombre de pièces") +
+  theme_minimal(base_size = 12) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p4)
+```
+On remarque que dans la plupart des zones (si on ignore les Na) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
+
+
+# Conclusions potentielles et limites
+
+* **Tendances observées** : On s'attend à retrouver des loyers beaucoup plus élevés dans la Zone 1 et 2 (Paris centre et communes très proches) et des loyers décroissants vers les zones plus éloignées. Les graphiques (médiane et moyenne pondérée) permettent de visualiser cet écart.
+
+* **Dispersion** : Les zones centrales montrent souvent une dispersion (EIQ) élevée — traduit par une hétérogénéité du parc (mix entre logements très chers et logements moins chers même dans une même zone).
+
+* **Limites** :
+
+  * Présence de NA pour plusieurs métriques.
+  * Le poids `obs` peut introduire un biais si certains ensembles sont sur-représentés ou sous représentés.
+
+
+
