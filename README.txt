@@ -1,8 +1,9 @@
 Voici le Projet final de R
+
 Le projet est composé de :
-  le raport en Markdown
-  l'app dans un dossier à part
-  la base de donnée trouvée sur le site de l'observatoir des loyes de l'aglomération parisienne (OLAP) https://www.observatoire-des-loyers.fr/
+  -le raport en Markdown
+  -l'app dans un dossier à part
+  -la base de donnée trouvée sur le site de l'observatoir des loyes de l'aglomération parisienne (OLAP) https://www.observatoire-des-loyers.fr/
 
 //Tuto pour l'application//
 Tous les fichiers se trouvent dans le dossier "ProjetRApp", vous y trouverez 3 fichiers : 
@@ -11,8 +12,6 @@ Tous les fichiers se trouvent dans le dossier "ProjetRApp", vous y trouverez 3 f
     - un ui.R pour l'interface graphique des fenêtres de l'application
 on a utilisé les librairies : shiny, ggplot2, dplyr et DT (pour faire des tableaux intéractifs)
 le dataset est à la fois dans le dossier principla et dans le dossier ProjetRApp et se nomme : "Paris2024-annexe-statistique-diffusion.csv"
-
-
 
 Informations pour la base de données : 
 
