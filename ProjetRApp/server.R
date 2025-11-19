@@ -1,3 +1,7 @@
+# ==================================================================
+# Fichier : server.R
+# ==================================================================
+
 # Fonction pour créer les listes HTML
 buildRankHTML <- function(data_frame, unit_label, background_color) {
   if (nrow(data_frame) == 0) {
@@ -25,7 +29,7 @@ buildRankHTML <- function(data_frame, unit_label, background_color) {
 server <- function(input, output, session) {
   
   # Données Filtrées (LA BASE) 
-
+  
   filteredData <- reactive({
     # Data provient de global.R
     req(data) # Vérifie que 'data' est chargé
@@ -80,7 +84,8 @@ server <- function(input, output, session) {
     }
     
     if (input$piecesFilter == "Tous") {
-      df_for_contracts <- df_for_contracts |> filter(Pieces == "(Non spécifié)")
+      # CORRECTION : Si on veut le total, on cherche la ligne agrégée "Ensemble"
+      df_for_contracts <- df_for_contracts |> filter(Pieces == "Ensemble")
     } else if (input$piecesFilter == "1-3P") {
       df_for_contracts <- df_for_contracts |> filter(Pieces %in% c("1P", "2P", "3P"))
     } else {
@@ -301,51 +306,51 @@ server <- function(input, output, session) {
         theme(plot.title = element_text(face = "bold"))
     }
   })
-    # ==========================================================
-    # NOUVELLE FENETRE 1: Loyers Moyens par Zone
-    # ==========================================================
-    output$avgZonePlot <- renderPlot({
-      req(filteredData(), input$avgMetric)
-      
-      # 1. Définir les variables
-      if (input$avgMetric == "m2") {
-        metric_col_sym <- sym("Loyer_m2_Moyenne")
-        title_lab <- "Loyer Moyen au m² (pondéré)"
-        x_lab <- "Loyer Moyen / m² (€)"
-      } else {
-        metric_col_sym <- sym("Loyer_Total_Moyenne")
-        title_lab <- "Loyer Moyen Total (pondéré)"
-        x_lab <- "Loyer Moyen Total (€)"
-      }
-      
-      # 2. Préparer les données
-      plot_data <- filteredData() |> 
-        filter(!is.na(!!metric_col_sym) & !is.na(obs))
-      
-      if (nrow(plot_data) == 0) {
-        return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
-      }
-      
-      # Agréger par Zone en utilisant une moyenne pondérée
-      plot_summary <- plot_data |> 
-        group_by(Zone) |> 
-        summarise(Loyer_Agg = weighted.mean(!!metric_col_sym, w = obs, na.rm = TRUE),
-                  .groups = 'drop') |> 
-        filter(!is.na(Loyer_Agg))
-      
-      # 3. Graphique
-      ggplot(plot_summary, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg))) +
-        geom_col(aes(fill = Zone), alpha = 0.8) +
-        geom_text(aes(label = round(Loyer_Agg, 1)), hjust = -0.2, size = 4) +
-        labs(title = title_lab,
-             subtitle = "Moyenne des catégories filtrées, pondérée par le nb. d'observations",
-             x = x_lab, y = "Zone") +
-        scale_fill_viridis_d() + 
-        theme_minimal(base_size = 14) +
-        # MODIFIÉ: Supprime la légende de couleur car les zones sont sur l'axe Y
-        theme(plot.title = element_text(face = "bold"),
-              legend.position = "none")
-    })
+  # ==========================================================
+  # NOUVELLE FENETRE 1: Loyers Moyens par Zone
+  # ==========================================================
+  output$avgZonePlot <- renderPlot({
+    req(filteredData(), input$avgMetric)
+    
+    # 1. Définir les variables
+    if (input$avgMetric == "m2") {
+      metric_col_sym <- sym("Loyer_m2_Moyenne")
+      title_lab <- "Loyer Moyen au m² (pondéré)"
+      x_lab <- "Loyer Moyen / m² (€)"
+    } else {
+      metric_col_sym <- sym("Loyer_Total_Moyenne")
+      title_lab <- "Loyer Moyen Total (pondéré)"
+      x_lab <- "Loyer Moyen Total (€)"
+    }
+    
+    # 2. Préparer les données
+    plot_data <- filteredData() |> 
+      filter(!is.na(!!metric_col_sym) & !is.na(obs))
+    
+    if (nrow(plot_data) == 0) {
+      return(ggplot() + geom_text(aes(x = 0, y = 0, label = "Aucune donnée à afficher."), size = 6) + theme_void())
+    }
+    
+    # Agréger par Zone en utilisant une moyenne pondérée
+    plot_summary <- plot_data |> 
+      group_by(Zone) |> 
+      summarise(Loyer_Agg = weighted.mean(!!metric_col_sym, w = obs, na.rm = TRUE),
+                .groups = 'drop') |> 
+      filter(!is.na(Loyer_Agg))
+    
+    # 3. Graphique
+    ggplot(plot_summary, aes(x = Loyer_Agg, y = reorder(Zone, Loyer_Agg))) +
+      geom_col(aes(fill = Zone), alpha = 0.8) +
+      geom_text(aes(label = round(Loyer_Agg, 1)), hjust = -0.2, size = 4) +
+      labs(title = title_lab,
+           subtitle = "Moyenne des catégories filtrées, pondérée par le nb. d'observations",
+           x = x_lab, y = "Zone") +
+      scale_fill_viridis_d() + 
+      theme_minimal(base_size = 14) +
+      # MODIFIÉ: Supprime la légende de couleur car les zones sont sur l'axe Y
+      theme(plot.title = element_text(face = "bold"),
+            legend.position = "none")
+  })
   
   
   # SORTIES: Simulateur (Onglet 6)
@@ -425,14 +430,20 @@ server <- function(input, output, session) {
                geom_text(aes(x = 0.5, y = 0.5, label = "Aucune donnée disponible"), size = 6) +
                theme_void())
     }
+    
+    # CORRECTION : On exclut la ligne "Ensemble" pour ne pas fausser les proportions
+    # car "Ensemble" est la somme des autres catégories.
     plot_df <- df |>
+      filter(Pieces != "Ensemble") |> 
       group_by(Zone, Pieces) |>
       summarise(N = sum(obs, na.rm = TRUE), .groups = "drop")
+    
     ggplot(plot_df, aes(x = Zone, y = N, fill = Pieces)) +
       geom_col(position = "fill") +
       scale_y_continuous(labels = scales::percent_format()) +
       labs(
         title = "Répartition du nombre de pièces par zone",
+        subtitle = "Hors catégorie agrégée 'Ensemble'",
         x = "Zone",
         y = "Proportion de logements",
         fill = "Nombre de pièces"
@@ -443,8 +454,5 @@ server <- function(input, output, session) {
         axis.text.x = element_text(angle = 45, hjust = 1)
       )
   })
-
-  
-  
   
 }

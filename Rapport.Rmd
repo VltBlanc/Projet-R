@@ -57,7 +57,8 @@ data <- data |>
   mutate(
     Zone = ifelse(is.na(Zone), "(Non spécifié)", Zone),
     Type = ifelse(is.na(Type), "(Non spécifié)", Type),
-    Pieces = ifelse(is.na(Pieces), "(Non spécifié)", Pieces),
+    # CORRECTION : Les valeurs NA pour les pièces correspondent à l'agrégat "Ensemble"
+    Pieces = ifelse(is.na(Pieces), "Ensemble", Pieces),
     Epoque_Construction = ifelse(is.na(Epoque_Construction), "(Non spécifié)", Epoque_Construction)
   )
 ```
@@ -184,30 +185,10 @@ On remarque que les zones proches du centre ont une dispersion des loyers plus �
 
 ```{r ,echo=FALSE}
 plot_df_pieces <- data |>
-  group_by(Zone, Pieces) |>
-  summarise(N = sum(obs, na.rm = TRUE), .groups = 'drop')
-
-# Filtrer pour garder catégories présentes
-plot_df_pieces <- plot_df_pieces |> 
-  filter(!is.na(Zone) & !is.na(Pieces))
-
-p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
-  geom_col(position = "fill") +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = "Répartition du nombre de pièces par zone", x = "Zone", y = "Proportion de logements", fill = "Nombre de pièces") +
-  theme_minimal(base_size = 12) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-print(p4)
-```
-
-On remarque que dans la plupart des zones (si on ignore les Non spécifié) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
-Le graphique sans les données non renseigné donne ceci :
-```{r, echo=FALSE}
-plot_df_pieces <- data |>
-  # Filtrer les données manquantes (NA) ou explicitement "Non renseigné"
+  # On exclut la ligne "Ensemble" pour ne garder que les détails (1P, 2P, 3P, 4P+)
   filter(
     Zone != "(Non spécifié)",
-    Pieces != "(Non spécifié)"
+    Pieces != "Ensemble"
   ) |>
   group_by(Zone, Pieces) |>
   summarise(N = sum(obs, na.rm = TRUE), .groups = 'drop')
@@ -226,6 +207,9 @@ p4 <- ggplot(plot_df_pieces, aes(x = Zone, y = N, fill = Pieces)) +
 
 print(p4)
 ```
+
+On remarque que dans la plupart des zones (si on ignore les Non spécifié) la proportion de logements la plus importante sont les 2 pièces. Cependant dans la zone 1 on remarque la présence conséquente de 4 pièces et plus.
+
 
 
 # Conclusions

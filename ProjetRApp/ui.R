@@ -1,3 +1,7 @@
+# ==================================================================
+# Fichier : ui.R
+# ==================================================================
+
 fluidPage(
   titlePanel("Analyse des Loyers - Paris 2024"),
   # Disposition avec une barre latérale et un panneau principal
@@ -167,7 +171,6 @@ fluidPage(
           )
         )
         
-      
       ) # fin tabsetPanel
     ) # fin mainPanel
   ) # fin sidebarLayout

@@ -1,3 +1,6 @@
+# ==================================================================
+# Fichier : global.R
+# ==================================================================
 
 # Charger les bibliothèques 
 library(shiny)
@@ -6,7 +9,6 @@ library(dplyr)
 library(DT)       # Pour les tableaux interactifs
 
 # Charger et préparer les données 
-
 file_path <- "Paris2024-annexe-statistique-diffusion.csv"
 
 if (!file.exists(file_path)) {
@@ -55,12 +57,13 @@ data <- data |>
   mutate(
     Zone = ifelse(is.na(Zone), "(Non spécifié)", Zone),
     Type = ifelse(is.na(Type), "(Non spécifié)", Type),
-    Pieces = ifelse(is.na(Pieces), "(Non spécifié)", Pieces),
+    # CORRECTION ICI : NA dans Pieces correspond à l'agrégat "Ensemble"
+    Pieces = ifelse(is.na(Pieces), "Ensemble", Pieces),
     Epoque_Construction = ifelse(is.na(Epoque_Construction), "(Non spécifié)", Epoque_Construction)
   )
 
 # Créer des listes pour les menus de filtre 
-# Data qui  seront disponibles dans ui.R et server.R
+# Data qui seront disponibles dans ui.R et server.R
 zone_choices <- unique(data$Zone)
 zone_choices <- zone_choices[zone_choices != "(Non spécifié)"] # Retirer le "Non spécifié" des choix
 all_zone <- c("Tous" = "Tous", unique(data$Zone))
